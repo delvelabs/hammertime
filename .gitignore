@@ -1,0 +1,24 @@
+#PyCharm
+*.iml
+.idea
+*.pyc
+__pycache__
+*.swp
+*~
+#PyDev
+.project
+.pydevproject
+#output
+.coverage
+cover/
+output/
+data/
+bin/
+include/
+lib/
+man/
+share/
+pip-selfcheck.json
+
+# cookies
+cookies*
