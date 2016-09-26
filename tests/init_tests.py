@@ -14,3 +14,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+from unittest import TestCase
+from fixtures import async_test
+
+from hammertime import HammerTime
+
+
+class InitTest(TestCase):
+
+    @async_test()
+    async def test_open_and_close(self, loop):
+        h = HammerTime(loop=loop)
+        await h.close()
+
+        self.assertEqual(h.completed_count, 0)
