@@ -1,4 +1,4 @@
-[logo]: misc/logo.png "HammerTime"
+![logo](https://raw.githubusercontent.com/delvelabs/hammertime/master/misc/logo.png)
 
 # HammerTime
 
