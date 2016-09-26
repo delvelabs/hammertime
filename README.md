@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/delvelabs/hammertime.svg?branch=master)](https://travis-ci.org/delvelabs/hammertime)
 ![logo](https://raw.githubusercontent.com/delvelabs/hammertime/master/misc/logo.png)
 
 # HammerTime
