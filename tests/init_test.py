@@ -19,6 +19,8 @@ from unittest import TestCase
 from fixtures import async_test
 
 from hammertime import HammerTime
+from hammertime.http import StaticResponse
+from hammertime.ruleset import StopRequest
 
 
 class InitTest(TestCase):
@@ -29,3 +31,84 @@ class InitTest(TestCase):
         await h.close()
 
         self.assertEqual(h.completed_count, 0)
+
+    @async_test()
+    async def test_add_requests_and_wait_for_completion(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        entry = await h.request("http://example.com")
+        self.assertEqual(entry.response.content, "http://example.com")
+        await h.close()
+
+    @async_test()
+    async def test_wait_for_multiple_requests(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        promise_1 = h.request("http://example.com/1")
+        promise_2 = h.request("http://example.com/2")
+
+        entry = await promise_2
+        self.assertEqual(entry.response.content, "http://example.com/2")
+
+        entry = await promise_1
+        self.assertEqual(entry.response.content, "http://example.com/1")
+        await h.close()
+
+        self.assertEqual(h.completed_count, 2)
+
+    @async_test()
+    async def test_loop_over_results(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        promise_1 = h.request("http://example.com/1")
+        promise_2 = h.request("http://example.com/2")
+
+        out = set()
+
+        async for entry in  h.successful_requests():
+            out.add(entry.response.content)
+
+        self.assertEqual(out, {"http://example.com/1", "http://example.com/2"})
+        self.assertEqual(h.completed_count, 2)
+
+    @async_test()
+    async def test_skip_results_that_fail(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        h.heuristics.add(BlockRequest("http://example.com/1"))
+        promise_1 = h.request("http://example.com/1")
+        promise_2 = h.request("http://example.com/2")
+
+        out = set()
+
+        async for entry in  h.successful_requests():
+            out.add(entry.response.content)
+
+        self.assertEqual(out, {"http://example.com/2"})
+        self.assertEqual(h.completed_count, 2)
+
+    @async_test()
+    async def test_provide_exception_when_resolving_specific_promise(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        h.heuristics.add(BlockRequest("http://example.com/1"))
+        future = h.request("http://example.com/1")
+
+        with self.assertRaises(StopRequest):
+            await future
+
+
+class FakeEngine:
+
+    async def perform(self, entry, heuristics):
+        await heuristics.before_request(entry)
+        entry = entry._replace(response=StaticResponse(200, {"Content-Type": "text/junk"}))
+        await heuristics.after_headers(entry)
+        entry.response.content = entry.request.url
+        await heuristics.after_response(entry)
+
+        return entry
+
+
+class BlockRequest:
+    def __init__(self, url):
+        self.url = url
+
+    async def before_request(self, entry):
+        if entry.request.url == self.url:
+            raise StopRequest()

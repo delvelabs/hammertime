@@ -36,5 +36,7 @@ class Result:
 
 class StaticResponse:
 
-    def __init__(self, code, raw):
-        pass
+    def __init__(self, code, headers, content=None):
+        self.code = code
+        self.headers = headers
+        self.content = content
