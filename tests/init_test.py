@@ -58,12 +58,12 @@ class InitTest(TestCase):
     @async_test()
     async def test_loop_over_results(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
-        promise_1 = h.request("http://example.com/1")
-        promise_2 = h.request("http://example.com/2")
+        h.request("http://example.com/1")
+        h.request("http://example.com/2")
 
         out = set()
 
-        async for entry in  h.successful_requests():
+        async for entry in h.successful_requests():
             out.add(entry.response.content)
 
         self.assertEqual(out, {"http://example.com/1", "http://example.com/2"})
@@ -73,12 +73,12 @@ class InitTest(TestCase):
     async def test_skip_results_that_fail(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
         h.heuristics.add(BlockRequest("http://example.com/1"))
-        promise_1 = h.request("http://example.com/1")
-        promise_2 = h.request("http://example.com/2")
+        h.request("http://example.com/1")
+        h.request("http://example.com/2")
 
         out = set()
 
-        async for entry in  h.successful_requests():
+        async for entry in h.successful_requests():
             out.add(entry.response.content)
 
         self.assertEqual(out, {"http://example.com/2"})
@@ -95,6 +95,14 @@ class InitTest(TestCase):
 
         with self.assertRaises(StopRequest):
             await future
+
+    @async_test()
+    async def test_retries_performed_and_response_obtained(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine(), retry_count=2)
+        h.heuristics.add(BlockRequest("http://example.com/1"))
+        _, resp, result = await h.request("http://example.com/1")
+
+        self.assertEqual(resp.content, "http://example.com/1")
 
 
 class FakeEngine(Engine):
@@ -114,5 +122,5 @@ class BlockRequest:
         self.url = url
 
     async def before_request(self, entry):
-        if entry.request.url == self.url:
+        if entry.request.url == self.url and entry.result.attempt < 3:
             raise StopRequest()

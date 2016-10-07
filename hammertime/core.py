@@ -28,17 +28,27 @@ logger = logging.getLogger(__name__)
 
 class HammerTime:
 
-    def __init__(self, loop=None, request_engine=None):
+    def __init__(self, loop=None, request_engine=None, retry_count=0):
         self.loop = loop
         self.request_engine = request_engine
-        self.completed_count = 0
-        self.requested_count = 0
+        self.retry_count = retry_count
         self.heuristics = Heuristics()
+
+        self.stats = Stats()
+
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
 
+    @property
+    def completed_count(self):
+        return self.stats.completed
+
+    @property
+    def requested_count(self):
+        return self.stats.requested
+
     def request(self, *args, **kwargs):
-        self.requested_count += 1
+        self.stats.requested += 1
         task = self.loop.create_task(self._request(*args, **kwargs))
         self.tasks.append(task)
         return task
@@ -46,16 +56,28 @@ class HammerTime:
     async def _request(self, *args, **kwargs):
         try:
             entry = Entry.create(*args, **kwargs)
-            entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
-            await self.completed_queue.put(entry)
-            return entry
+            return await self._perform_with_retry(entry)
         except StopRequest:
             raise
         except Exception as e:
             logger.exception(e)
         finally:
-            self.completed_count += 1
+            self.stats.completed += 1
             self.loop.call_soon(self._check_completion)
+
+    async def _perform_with_retry(self, entry):
+        while True:
+            try:
+                entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
+                await self.completed_queue.put(entry)
+                return entry
+            except StopRequest:
+                if entry.result.attempt > self.retry_count:
+                    raise
+                else:
+                    entry.result.attempt += 1
+                    self.stats.retries += 1
+                    entry = entry._replace(response=None)
 
     def successful_requests(self):
         self._check_completion()
@@ -114,3 +136,11 @@ class QueueIterator:
             return out
         except asyncio.queues.QueueEmpty:
             raise StopAsyncIteration
+
+
+class Stats:
+
+    def __init__(self):
+        self.requested = 0
+        self.completed = 0
+        self.retries = 0

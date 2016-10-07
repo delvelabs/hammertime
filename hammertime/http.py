@@ -31,7 +31,7 @@ class Request:
 
 class Result:
     def __init__(self):
-        pass
+        self.attempt = 1
 
 
 class StaticResponse:
