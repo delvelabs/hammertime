@@ -17,6 +17,8 @@
 
 import asyncio
 import logging
+from collections import deque
+
 from .http import Entry
 from .ruleset import Heuristics, StopRequest
 
@@ -27,17 +29,19 @@ logger = logging.getLogger(__name__)
 class HammerTime:
 
     def __init__(self, loop=None, request_engine=None):
-        self.loop = loop or asyncio.get_event_loop()
+        self.loop = loop
         self.request_engine = request_engine
         self.completed_count = 0
         self.requested_count = 0
         self.heuristics = Heuristics()
-        self.completed = None
         self.completed_queue = asyncio.Queue(loop=self.loop)
+        self.tasks = deque()
 
     def request(self, *args, **kwargs):
         self.requested_count += 1
-        return self.loop.create_task(self._request(*args, **kwargs))
+        task = self.loop.create_task(self._request(*args, **kwargs))
+        self.tasks.append(task)
+        return task
 
     async def _request(self, *args, **kwargs):
         try:
@@ -51,30 +55,47 @@ class HammerTime:
             logger.exception(e)
         finally:
             self.completed_count += 1
-            self._check_completion()
+            self.loop.call_soon(self._check_completion)
 
     def successful_requests(self):
-        self._initialize_completion_check()
-        return QueueIterator(self.completed_queue, self.completed)
-
-    def _initialize_completion_check(self):
-        if self.completed is None or self.completed.done():
-            self.completed = asyncio.Future(loop=self.loop)
-            self._check_completion()
+        self._check_completion()
+        return QueueIterator(self.completed_queue)
 
     def _check_completion(self):
-        if self.completed is not None and self.requested_count == self.completed_count:
-            self.completed.set_result(True)
+        try:
+            while True:
+                task = self.tasks.popleft()
+                if task.done():
+                    self._drain(task)
+                else:
+                    self.tasks.appendleft(task)
+                    return
+        except IndexError:
+            self.completed_queue.put_nowait(None)
+
+    def _drain(self, task):
+        try:
+            task.result()
+        except StopRequest:
+            pass
+        except Exception as e:
+            logger.exception(e)
 
     async def close(self):
-        pass
+        for t in self.tasks:
+            if t.done():
+                self._drain(t)
+            else:
+                t.cancel()
+
+        if self.request_engine is not None:
+            await self.request_engine.close()
 
 
 class QueueIterator:
 
-    def __init__(self, queue, completed_future):
+    def __init__(self, queue):
         self.queue = queue
-        self.completed_future = completed_future
 
     async def __aiter__(self):
         return self
@@ -82,9 +103,9 @@ class QueueIterator:
     async def __anext__(self):
         try:
             out = None
-            if self.completed_future.done() and not self.queue.empty():
+            if not self.queue.empty():
                 out = self.queue.get_nowait()
-            elif not self.completed_future.done():
+            else:
                 out = await self.queue.get()
 
             if out is None:

@@ -18,7 +18,8 @@
 from unittest import TestCase
 from fixtures import async_test
 
-from hammertime import HammerTime
+from hammertime.core import HammerTime
+from hammertime.engine import Engine
 from hammertime.http import StaticResponse
 from hammertime.ruleset import StopRequest
 
@@ -92,8 +93,11 @@ class InitTest(TestCase):
         with self.assertRaises(StopRequest):
             await future
 
+        with self.assertRaises(StopRequest):
+            await future
 
-class FakeEngine:
+
+class FakeEngine(Engine):
 
     async def perform(self, entry, heuristics):
         await heuristics.before_request(entry)

@@ -15,10 +15,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .core import HammerTime
-from .config import defaults
 
+class Engine:
 
-HammerTime = defaults.wrap(HammerTime)
+    async def perform(self, entry, heuristics):
+        raise NotImplemented()
 
-__all__ = [HammerTime]
+    async def close(self):
+        pass

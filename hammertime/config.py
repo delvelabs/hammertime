@@ -15,10 +15,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .core import HammerTime
-from .config import defaults
+import asyncio
+from easyinject import Injector
+
+from .engine import AioHttpEngine
 
 
-HammerTime = defaults.wrap(HammerTime)
-
-__all__ = [HammerTime]
+defaults = Injector(loop=asyncio.get_event_loop,
+                    request_engine=AioHttpEngine)
