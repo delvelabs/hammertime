@@ -63,5 +63,13 @@ class RuleSet:
             await r(entry)
 
 
-class StopRequest(Exception):
+class HammerTimeException(Exception):
+    pass
+
+
+class StopRequest(HammerTimeException):
+    pass
+
+
+class RejectRequest(HammerTimeException):
     pass

@@ -21,7 +21,8 @@ from fixtures import async_test
 from hammertime.core import HammerTime
 from hammertime.engine import Engine
 from hammertime.http import StaticResponse
-from hammertime.ruleset import StopRequest
+from hammertime.ruleset import StopRequest, RejectRequest
+from hammertime.rules import RejectStatusCode
 
 
 class InitTest(TestCase):
@@ -95,6 +96,17 @@ class InitTest(TestCase):
 
         with self.assertRaises(StopRequest):
             await future
+
+    @async_test()
+    async def test_explicit_abandon_obtained_when_requested(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine(), retry_count=2)
+        h.heuristics.add(RejectStatusCode(range(0, 600)))  # Everything
+        future = h.request("http://example.com/1")
+
+        with self.assertRaises(RejectRequest):
+            await future
+
+        self.assertEqual(0, h.stats.retries)
 
     @async_test()
     async def test_retries_performed_and_response_obtained(self, loop):

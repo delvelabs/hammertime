@@ -15,12 +15,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import time
 import asyncio
 import logging
 from collections import deque
 
 from .http import Entry
-from .ruleset import Heuristics, StopRequest
+from .ruleset import Heuristics, StopRequest, HammerTimeException
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class HammerTime:
         try:
             entry = Entry.create(*args, **kwargs)
             return await self._perform_with_retry(entry)
-        except StopRequest:
+        except HammerTimeException:
             raise
         except Exception as e:
             logger.exception(e)
@@ -98,7 +99,7 @@ class HammerTime:
     def _drain(self, task):
         try:
             task.result()
-        except StopRequest:
+        except HammerTimeException:
             pass
         except Exception as e:
             logger.exception(e)
@@ -141,6 +142,15 @@ class QueueIterator:
 class Stats:
 
     def __init__(self):
+        self.init = time.time()
         self.requested = 0
         self.completed = 0
         self.retries = 0
+
+    @property
+    def duration(self):
+        return time.time() - self.init
+
+    @property
+    def rate(self):
+        return self.completed / self.duration

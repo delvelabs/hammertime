@@ -21,7 +21,7 @@ from async_timeout import timeout
 from aiohttp import ClientSession
 from aiohttp.errors import ClientOSError
 from ..http import StaticResponse
-from ..ruleset import StopRequest
+from ..ruleset import StopRequest, RejectRequest
 
 
 class AioHttpEngine:
@@ -48,7 +48,8 @@ class AioHttpEngine:
         with timeout(0.5, loop=self.loop):
             response = await self.session.request(method=req.method, url=req.url, timeout=0.2)
 
-        async with response:
+        # When the request is simply rejected, we want to keep the persistent connection alive
+        async with ProtectedSession(response, RejectRequest):
             resp = StaticResponse(response.status, response.headers)
             entry = entry._replace(response=resp)
 
@@ -57,9 +58,32 @@ class AioHttpEngine:
             with timeout(2.0):
                 entry.response.content = await response.text()
 
-            await heuristics.after_response(entry)
+        await heuristics.after_response(entry)
 
-            return entry
+        return entry
 
     async def close(self):
         await self.session.close()
+
+
+class ProtectedSession:
+    """
+    Make sure the parent context closes properly even if a certain type
+    of exception is raised.
+    """
+
+    def __init__(self, context, exception_class):
+        self.context = context
+        self.exception_class = exception_class
+
+    async def __aenter__(self):
+        await self.context.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if exc_type == self.exception_class:
+            # Simple release
+            await self.context.__aexit__(None, None, None)
+        else:
+            # Close
+            await self.context.__aexit__(exc_type, exc, tb)

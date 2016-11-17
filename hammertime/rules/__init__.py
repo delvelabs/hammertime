@@ -15,30 +15,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from collections import namedtuple
+from .status import RejectStatusCode
 
 
-Entry = namedtuple('Entry', ['request', 'response', 'result'])
-Entry.create = lambda *args, response=None, **kwargs: Entry(request=Request(*args, **kwargs),
-                                                            response=response,
-                                                            result=Result())
-
-
-class Request:
-
-    def __init__(self, url, *, method='GET'):
-        self.method = method
-        self.url = url
-
-
-class Result:
-    def __init__(self):
-        self.attempt = 1
-
-
-class StaticResponse:
-
-    def __init__(self, code, headers, content=None):
-        self.code = code
-        self.headers = headers
-        self.content = content
+__all__ = [
+    RejectStatusCode,
+]
