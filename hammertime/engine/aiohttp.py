@@ -21,7 +21,7 @@ from async_timeout import timeout
 from aiohttp import ClientSession
 from aiohttp.errors import ClientOSError
 from ..http import StaticResponse
-from ..ruleset import StopRequest, RejectRequest
+from ..ruleset import StopRequest, RejectRequest, IgnoreBody
 
 
 class AioHttpEngine:
@@ -53,10 +53,14 @@ class AioHttpEngine:
             resp = StaticResponse(response.status, response.headers)
             entry = entry._replace(response=resp)
 
-            await heuristics.after_headers(entry)
+            try:
+                await heuristics.after_headers(entry)
 
-            with timeout(2.0):
-                entry.response.content = await response.text()
+                with timeout(2.0):
+                    entry.response.content = await response.text()
+                    entry.result.body = 'full'
+            except IgnoreBody:
+                entry.result.body = 'ignored'
 
         await heuristics.after_response(entry)
 

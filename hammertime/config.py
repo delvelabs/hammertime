@@ -19,7 +19,9 @@ import asyncio
 from easyinject import Injector
 
 from .engine import AioHttpEngine
+from .kb import KnowledgeBase
 
 
 defaults = Injector(loop=asyncio.get_event_loop,
-                    request_engine=AioHttpEngine)
+                    request_engine=AioHttpEngine,
+                    kb=KnowledgeBase)

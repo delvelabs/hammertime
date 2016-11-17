@@ -108,6 +108,24 @@ class HeuristicsTest(TestCase):
         with self.assertRaises(ValueError):
             h.add(a)
 
+    def test_assign_engine_and_kb_on_heuristics(self):
+        a = HeuristicA()
+        b = HeuristicB()
+
+        h = Heuristics(request_engine="X", kb="Y")
+        h.add_multiple([a, b])
+        self.assertEqual(a.engine_set, "X")
+        self.assertEqual(b.kb_set, "Y")
+
+    def test_do_not_override_with_none(self):
+        a = HeuristicA()
+        b = HeuristicB()
+
+        h = Heuristics()
+        h.add_multiple([a, b])
+        self.assertEqual(a.engine_set, "NO")
+        self.assertEqual(b.kb_set, "NO")
+
 
 class HeuristicBad:
     pass
@@ -119,6 +137,12 @@ class HeuristicNonAsync:
 
 
 class HeuristicA:
+
+    engine_set = "NO"
+
+    def set_engine(self, engine):
+        self.engine_set = engine
+
     async def before_request(self, entry):
         pass
 
@@ -127,6 +151,12 @@ class HeuristicA:
 
 
 class HeuristicB:
+
+    kb_set = "NO"
+
+    def set_kb(self, kb):
+        self.kb_set = kb
+
     async def before_request(self, entry):
         pass
 

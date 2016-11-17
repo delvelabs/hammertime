@@ -16,8 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from .status import RejectStatusCode
+from .body import IgnoreLargeBody
 
 
 __all__ = [
     RejectStatusCode,
+    IgnoreLargeBody,
 ]

@@ -22,8 +22,10 @@ class Heuristics:
 
     EVENTS = {"before_request", "after_headers", "after_response"}
 
-    def __init__(self):
+    def __init__(self, kb=None, request_engine=None):
         self.rulesets = {event: RuleSet() for event in self.EVENTS}
+        self.kb = kb
+        self.request_engine = request_engine
 
         for key, rs in self.rulesets.items():
             setattr(self, key, rs.accept)
@@ -35,6 +37,13 @@ class Heuristics:
     def add(self, heuristic):
         applied = False
         supported = dir(heuristic)
+
+        if "set_engine" in supported and self.request_engine is not None:
+            heuristic.set_engine(self.request_engine)
+
+        if "set_kb" in supported and self.kb is not None:
+            heuristic.set_kb(self.kb)
+
         for event in self.EVENTS:
             if event in supported:
                 self.rulesets[event].add(getattr(heuristic, event))
@@ -72,4 +81,8 @@ class StopRequest(HammerTimeException):
 
 
 class RejectRequest(HammerTimeException):
+    pass
+
+
+class IgnoreBody(Exception):
     pass

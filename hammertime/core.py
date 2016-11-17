@@ -29,11 +29,11 @@ logger = logging.getLogger(__name__)
 
 class HammerTime:
 
-    def __init__(self, loop=None, request_engine=None, retry_count=0):
+    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0):
         self.loop = loop
         self.request_engine = request_engine
         self.retry_count = retry_count
-        self.heuristics = Heuristics()
+        self.heuristics = Heuristics(kb=kb, request_engine=request_engine)
 
         self.stats = Stats()
 

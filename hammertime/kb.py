@@ -15,31 +15,23 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from collections import namedtuple
 
+class KnowledgeBase:
 
-Entry = namedtuple('Entry', ['request', 'response', 'result'])
-Entry.create = lambda *args, response=None, **kwargs: Entry(request=Request(*args, **kwargs),
-                                                            response=response,
-                                                            result=Result())
-
-
-class Request:
-
-    def __init__(self, url, *, method='GET'):
-        self.method = method
-        self.url = url
-
-
-class Result:
     def __init__(self):
-        self.attempt = 1
-        self.body = 'unprocessed'
+        self.__dict__["entries"] = {}
 
+    def __contains__(self, key):
+        return key in self.entries
 
-class StaticResponse:
+    def __setattr__(self, key, value):
+        if key not in self:
+            self.entries[key] = value
+        else:
+            raise AttributeError(key)
 
-    def __init__(self, code, headers, content=None):
-        self.code = code
-        self.headers = headers
-        self.content = content
+    def __getattr__(self, key):
+        if key in self:
+            return self.entries[key]
+        else:
+            raise AttributeError(key)
