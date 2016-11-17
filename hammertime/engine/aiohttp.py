@@ -19,6 +19,7 @@ import asyncio
 from async_timeout import timeout
 
 from aiohttp import ClientSession
+from aiohttp.errors import ClientOSError
 from ..http import StaticResponse
 from ..ruleset import StopRequest
 
@@ -33,16 +34,19 @@ class AioHttpEngine:
     async def perform(self, entry, heuristics):
         async with self.limiter:
             try:
-                with timeout(3.0, loop=self.loop):
-                    await heuristics.before_request(entry)
+                await heuristics.before_request(entry)
 
-                    return await self._perform(entry, heuristics)
+                return await self._perform(entry, heuristics)
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 raise StopRequest("Timeout reached")
+            except (ClientOSError):
+                raise StopRequest("Host Unreachable")
 
     async def _perform(self, entry, heuristics):
         req = entry.request
-        response = await self.session.request(method=req.method, url=req.url, timeout=0.2)
+
+        with timeout(0.5, loop=self.loop):
+            response = await self.session.request(method=req.method, url=req.url, timeout=0.2)
 
         async with response:
             resp = StaticResponse(response.status, response.headers)
@@ -50,7 +54,8 @@ class AioHttpEngine:
 
             await heuristics.after_headers(entry)
 
-            entry.response.content = await response.text()
+            with timeout(2.0):
+                entry.response.content = await response.text()
 
             await heuristics.after_response(entry)
 

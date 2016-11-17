@@ -18,6 +18,7 @@ include/
 lib/
 man/
 share/
+src/
 pip-selfcheck.json
 
 # cookies
