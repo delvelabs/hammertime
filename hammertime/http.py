@@ -34,7 +34,7 @@ class Request:
 class Result:
     def __init__(self):
         self.attempt = 1
-        self.body = 'unprocessed'
+        self.read_length = -1  # -1 is unlimited
 
 
 class StaticResponse:
@@ -43,3 +43,12 @@ class StaticResponse:
         self.code = code
         self.headers = headers
         self.content = content
+        self.trucated = False
+
+    @property
+    def raw(self):
+        return self.content.encode('utf-8')
+
+    @raw.setter
+    def raw(self, value):
+        self.content = value.decode('utf-8')

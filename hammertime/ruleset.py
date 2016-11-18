@@ -82,7 +82,3 @@ class StopRequest(HammerTimeException):
 
 class RejectRequest(HammerTimeException):
     pass
-
-
-class IgnoreBody(Exception):
-    pass

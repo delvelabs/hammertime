@@ -21,7 +21,6 @@ import random
 
 from hammertime.rules import IgnoreLargeBody
 from hammertime.http import Entry, StaticResponse
-from hammertime.ruleset import IgnoreBody
 from hammertime.kb import KnowledgeBase
 
 
@@ -30,31 +29,46 @@ class IgnoreLargeBodyTest(TestCase):
     def setUp(self):
         self.r = IgnoreLargeBody()
         self.r.set_kb(KnowledgeBase())
+        self.entry = Entry.create("http://example.om/test", response=StaticResponse(200, {}))
 
     @async_test()
     async def test_content_length_not_specified(self):
-        await self.r.after_headers(Entry.create("http://example.om/test", response=StaticResponse(200, {})))
+        await self.r.after_headers(self.entry)
+
+        self.assertEqual(self.entry.result.read_length, -1)
 
     @async_test()
     async def test_receive_length_as_string(self):
-        await self.r.after_headers(Entry.create("http://example.om/test",
-                                                response=StaticResponse(200, {'Content-Length': "500"})))
+        self.entry.response.headers['Content-Length'] = "500"
+        await self.r.after_headers(self.entry)
+
         self.assertIn(500, self.r.data.collected_sizes)
+        self.assertEqual(self.entry.result.read_length, self.r.initial_limit)
 
     @async_test()
     async def test_value_is_not_a_number(self):
-        await self.r.after_headers(Entry.create("http://example.om/test",
-                                                response=StaticResponse(200, {'Content-Length': "fivehundred"})))
+        self.entry.response.headers['Content-Length'] = "fivehundred"
+        await self.r.after_headers(self.entry)
+
         self.assertEqual([], self.r.data.collected_sizes)
+        self.assertEqual(self.entry.result.read_length, -1)
 
     @async_test()
-    async def test_content_length_defined(self):
-        await self.r.after_headers(Entry.create("http://example.om/test",
-                                                response=StaticResponse(200, {'Content-Length': self.r.initial_limit / 2})))
+    async def test_content_length_below_limit(self):
+        self.entry.response.headers['Content-Length'] = self.r.initial_limit / 2
+        await self.r.after_headers(self.entry)
 
-        with self.assertRaises(IgnoreBody):
-            await self.r.after_headers(Entry.create("http://example.om/test",
-                                                    response=StaticResponse(200, {'Content-Length': self.r.initial_limit * 2})))
+        self.assertEqual(self.entry.result.read_length, self.r.initial_limit)
+
+    @async_test()
+    async def test_content_length_above_limit(self):
+        self.entry.response.headers['Content-Length'] = self.r.initial_limit * 2
+        await self.r.after_headers(self.entry)
+
+        self.assertEqual(self.entry.result.read_length, self.r.initial_limit)
+
+        await self.r.after_headers(Entry.create("http://example.om/test",
+                                                response=StaticResponse(200, {'Content-Length': self.r.initial_limit * 2})))
 
     @async_test()
     async def test_content_size_adjusts_over_time(self):
@@ -62,6 +76,39 @@ class IgnoreLargeBodyTest(TestCase):
             await self.r.after_headers(Entry.create("http://example.om/test",
                                                     response=StaticResponse(200, {'Content-Length': random.randint(10000, 20000)})))
 
-        with self.assertRaises(IgnoreBody):
+        self.entry.response.headers['Content-Length'] = self.r.initial_limit / 2
+        await self.r.after_headers(self.entry)
+        self.assertLess(self.entry.result.read_length, self.r.initial_limit)
+        self.assertNotEqual(self.entry.result.read_length, -1)
+
+    @async_test()
+    async def test_no_not_read_full_once_statistics_are_obtained(self):
+        for _ in range(1000):
             await self.r.after_headers(Entry.create("http://example.om/test",
-                                                    response=StaticResponse(200, {'Content-Length': self.r.initial_limit / 2})))
+                                                    response=StaticResponse(200, {'Content-Length': random.randint(10000, 20000)})))
+
+        await self.r.after_headers(self.entry)
+        self.assertLess(self.entry.result.read_length, self.r.initial_limit)
+        self.assertNotEqual(self.entry.result.read_length, -1)
+
+    @async_test()
+    async def test_post_response_size_calculation(self):
+        self.r.data.initial_limit = 5
+        self.entry.response.content = "1234567890"
+
+        await self.r.after_response(self.entry)
+
+        self.assertIn(10, self.r.data.collected_sizes)
+        self.assertEqual(self.entry.response.content, "12345")
+        self.assertTrue(self.entry.response.truncated)
+        self.assertEqual(self.entry.result.read_length, 5)
+
+    @async_test()
+    async def test_post_response_calculation_does_not_apply_when_read_size_was_specified(self):
+        self.r.data.initial_limit = 5
+        self.entry.result.read_length = 5
+        self.entry.response.content = "1234567890"
+
+        await self.r.after_response(self.entry)
+
+        self.assertEqual([], self.r.data.collected_sizes)

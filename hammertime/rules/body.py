@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-from ..ruleset import IgnoreBody
 from statistics import mean, stdev
 import logging
 
@@ -34,15 +33,34 @@ class IgnoreLargeBody:
         kb.body_size = self.data
 
     async def after_headers(self, entry):
-        length = entry.response.headers.get('Content-Length')
+        entry.result.read_length = self._get_read_limit(entry.response)
+
+    async def after_response(self, entry):
+        if entry.result.read_length == -1:
+            # Collect statistics post-response when the content-length was unknown.
+            full_length = len(entry.response.raw)
+            limit = self.data.applicable_limit
+            self.data.add(full_length)
+
+            if full_length > limit:
+                # Apply the limit post-response if above the desired limit
+                # Keep read_length coherent with the content for other heuristics to
+                # work from.
+                entry.response.raw = entry.response.raw[0:limit]
+                entry.response.truncated = True
+                entry.result.read_length = limit
+
+    def _get_read_limit(self, response):
+        length = response.headers.get('Content-Length')
         if length is not None:
             try:
                 length = int(length)
                 self.data.add(length)
-                if length > self.data.applicable_limit:
-                    raise IgnoreBody()
+                return  self.data.applicable_limit
             except ValueError:
                 logger.debug("Bad Content-Length: %s", length)
+
+        return self.data.calculated_limit or -1
 
 
 class BodySize:

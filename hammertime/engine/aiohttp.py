@@ -20,8 +20,7 @@ from async_timeout import timeout
 
 from aiohttp import ClientSession
 from aiohttp.errors import ClientOSError
-from ..http import StaticResponse
-from ..ruleset import StopRequest, RejectRequest, IgnoreBody
+from ..ruleset import StopRequest, RejectRequest
 
 
 class AioHttpEngine:
@@ -50,17 +49,15 @@ class AioHttpEngine:
 
         # When the request is simply rejected, we want to keep the persistent connection alive
         async with ProtectedSession(response, RejectRequest):
-            resp = StaticResponse(response.status, response.headers)
+            resp = Response(response.status, response.headers)
             entry = entry._replace(response=resp)
 
-            try:
-                await heuristics.after_headers(entry)
+            await heuristics.after_headers(entry)
 
-                with timeout(2.0):
-                    entry.response.content = await response.text()
-                    entry.result.body = 'full'
-            except IgnoreBody:
-                entry.result.body = 'ignored'
+            with timeout(2.0):
+                # read_length is set to -1 if unlimited, which is the same as aiohttp
+                max_length = entry.result.read_length
+                entry.response.set_content(await response.content.read(max_length), response.content.at_eof())
 
         await heuristics.after_response(entry)
 
@@ -91,3 +88,21 @@ class ProtectedSession:
         else:
             # Close
             await self.context.__aexit__(exc_type, exc, tb)
+
+
+class Response:
+
+    def __init__(self, status, headers):
+        self.code = status
+        self.headers = headers
+
+    def set_content(self, data, at_eof):
+        self.raw = data
+        self.truncated = not at_eof
+
+    @property
+    def content(self):
+        if self.truncated:
+            raise ValueError("Content is only partially read")
+
+        return self.raw.decode('utf-8')
