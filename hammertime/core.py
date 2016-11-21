@@ -22,6 +22,7 @@ from collections import deque
 
 from .http import Entry
 from .ruleset import Heuristics, StopRequest, HammerTimeException
+from .engine import RetryEngine
 
 
 logger = logging.getLogger(__name__)
@@ -31,11 +32,10 @@ class HammerTime:
 
     def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0):
         self.loop = loop
-        self.request_engine = request_engine
-        self.retry_count = retry_count
-        self.heuristics = Heuristics(kb=kb, request_engine=request_engine)
-
         self.stats = Stats()
+
+        self.request_engine = RetryEngine(request_engine, stats=self.stats, retry_count=retry_count)
+        self.heuristics = Heuristics(kb=kb, request_engine=request_engine)
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
@@ -57,7 +57,9 @@ class HammerTime:
     async def _request(self, *args, **kwargs):
         try:
             entry = Entry.create(*args, **kwargs)
-            return await self._perform_with_retry(entry)
+            entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
+            await self.completed_queue.put(entry)
+            return entry
         except HammerTimeException:
             raise
         except Exception as e:
@@ -65,20 +67,6 @@ class HammerTime:
         finally:
             self.stats.completed += 1
             self.loop.call_soon(self._check_completion)
-
-    async def _perform_with_retry(self, entry):
-        while True:
-            try:
-                entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
-                await self.completed_queue.put(entry)
-                return entry
-            except StopRequest:
-                if entry.result.attempt > self.retry_count:
-                    raise
-                else:
-                    entry.result.attempt += 1
-                    self.stats.retries += 1
-                    entry = entry._replace(response=None)
 
     def successful_requests(self):
         self._check_completion()
