@@ -28,18 +28,16 @@ class AioHttpEngine:
     def __init__(self, *, loop):
         self.loop = loop
         self.session = ClientSession(loop=loop)
-        self.limiter = asyncio.Semaphore(50)
 
     async def perform(self, entry, heuristics):
-        async with self.limiter:
-            try:
-                await heuristics.before_request(entry)
+        try:
+            await heuristics.before_request(entry)
 
-                return await self._perform(entry, heuristics)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                raise StopRequest("Timeout reached")
-            except (ClientOSError):
-                raise StopRequest("Host Unreachable")
+            return await self._perform(entry, heuristics)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            raise StopRequest("Timeout reached")
+        except (ClientOSError):
+            raise StopRequest("Host Unreachable")
 
     async def _perform(self, entry, heuristics):
         req = entry.request
