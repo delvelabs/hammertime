@@ -30,11 +30,26 @@ class Request:
         self.method = method
         self.url = url
 
+    def __hash__(self):
+        return hash(self.__dict__)
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __repr__(self):
+        return "Request(%s %s)" % (self.method, self.url)
+
 
 class Result:
     def __init__(self):
         self.attempt = 1
         self.read_length = -1  # -1 is unlimited
+
+    def __hash__(self):
+        return hash(self.__dict__)
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
 
 
 class StaticResponse:

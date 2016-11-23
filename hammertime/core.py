@@ -35,7 +35,7 @@ class HammerTime:
         self.stats = Stats()
 
         self.request_engine = RetryEngine(request_engine, loop=loop, stats=self.stats, retry_count=retry_count)
-        self.heuristics = Heuristics(kb=kb, request_engine=request_engine)
+        self.heuristics = Heuristics(kb=kb, request_engine=self.request_engine)
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
@@ -131,6 +131,7 @@ class Stats:
 
     def __init__(self):
         self.init = time.time()
+
         self.requested = 0
         self.completed = 0
         self.retries = 0
