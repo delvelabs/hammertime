@@ -16,12 +16,27 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import asyncio
+import logging
 from easyinject import Injector
 
 from .engine import AioHttpEngine
 from .kb import KnowledgeBase
 
 
-defaults = Injector(loop=asyncio.get_event_loop,
+def custom_event_loop():
+    try:
+        import uvloop
+        loop = uvloop.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        logger = logging.getLogger(__name__)
+        logger.debug('Using uvloop')
+    except ImportError:
+        pass
+
+    return asyncio.get_event_loop()
+
+
+defaults = Injector(loop=custom_event_loop,
                     request_engine=AioHttpEngine,
                     kb=KnowledgeBase)
