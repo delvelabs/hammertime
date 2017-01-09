@@ -8,4 +8,9 @@ setup(name='HammerTime',
       author='Delve Labs inc.',
       author_email='info@delvelabs.ca',
       url='https://github.com/delvelabs/hammertime',
-      packages=['hammertime'])
+      packages=['hammertime'],
+      install_requires=[
+          'aiohttp',
+          'async_timeout',
+          'easyinject',
+      ])
