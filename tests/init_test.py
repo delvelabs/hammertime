@@ -42,6 +42,12 @@ class InitTest(TestCase):
         await h.close()
 
     @async_test()
+    async def test_preserve_arguments(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        entry = await h.request("http://example.com", arguments={"hello": "world"})
+        self.assertEqual(entry.arguments["hello"], "world")
+
+    @async_test()
     async def test_wait_for_multiple_requests(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
         promise_1 = h.request("http://example.com/1")
@@ -112,9 +118,9 @@ class InitTest(TestCase):
     async def test_retries_performed_and_response_obtained(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine(), retry_count=2)
         h.heuristics.add(BlockRequest("http://example.com/1"))
-        _, resp, result = await h.request("http://example.com/1")
+        entry = await h.request("http://example.com/1")
 
-        self.assertEqual(resp.content, "http://example.com/1")
+        self.assertEqual(entry.response.content, "http://example.com/1")
 
 
 class FakeEngine(Engine):
