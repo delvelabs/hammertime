@@ -58,7 +58,7 @@ class StaticResponse:
         self.code = code
         self.headers = headers
         self.content = content
-        self.trucated = False
+        self.truncated = False
 
     @property
     def raw(self):
