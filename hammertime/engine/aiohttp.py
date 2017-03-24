@@ -65,7 +65,7 @@ class AioHttpEngine:
 
         return entry
 
-    def close(self):
+    async def close(self):
         self.session.close()
 
 

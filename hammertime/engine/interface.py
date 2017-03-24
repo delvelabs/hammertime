@@ -21,5 +21,5 @@ class Engine:
     async def perform(self, entry, heuristics):
         raise NotImplemented()
 
-    def close(self):
+    async def close(self):
         pass

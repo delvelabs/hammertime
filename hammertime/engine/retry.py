@@ -43,6 +43,6 @@ class RetryEngine(Engine):
                         self.stats.retries += 1
                         entry = entry._replace(response=None)
 
-    def close(self):
+    async def close(self):
         if self.request_engine is not None:
             self.request_engine.close()

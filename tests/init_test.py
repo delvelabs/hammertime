@@ -30,7 +30,7 @@ class InitTest(TestCase):
     @async_test()
     async def test_open_and_close(self, loop):
         h = HammerTime(loop=loop)
-        h.close()
+        await h.close()
 
         self.assertEqual(h.completed_count, 0)
 
@@ -39,7 +39,7 @@ class InitTest(TestCase):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
         entry = await h.request("http://example.com")
         self.assertEqual(entry.response.content, "http://example.com")
-        h.close()
+        await h.close()
 
     @async_test()
     async def test_preserve_arguments(self, loop):
@@ -58,7 +58,7 @@ class InitTest(TestCase):
 
         entry = await promise_1
         self.assertEqual(entry.response.content, "http://example.com/1")
-        h.close()
+        await h.close()
 
         self.assertEqual(h.completed_count, 2)
 
