@@ -45,4 +45,4 @@ class RetryEngine(Engine):
 
     async def close(self):
         if self.request_engine is not None:
-            self.request_engine.close()
+            await self.request_engine.close()
