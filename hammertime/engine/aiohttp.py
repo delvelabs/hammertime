@@ -19,7 +19,7 @@ import asyncio
 from async_timeout import timeout
 
 from aiohttp import ClientSession
-from aiohttp.errors import ClientOSError, ClientResponseError
+from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
 from ..ruleset import StopRequest, RejectRequest
 
 
@@ -40,6 +40,8 @@ class AioHttpEngine:
             raise StopRequest("Host Unreachable")
         except ClientResponseError:
             raise StopRequest("Connection Error")
+        except ServerDisconnectedError:
+            raise StopRequest("Server Disconnected")
 
     async def _perform(self, entry, heuristics):
         req = entry.request
@@ -63,8 +65,8 @@ class AioHttpEngine:
 
         return entry
 
-    async def close(self):
-        await self.session.close()
+    def close(self):
+        self.session.close()
 
 
 class ProtectedSession:

@@ -92,7 +92,7 @@ class HammerTime:
         except Exception as e:
             logger.exception(e)
 
-    async def close(self):
+    def close(self):
         for t in self.tasks:
             if t.done():
                 self._drain(t)
@@ -100,7 +100,7 @@ class HammerTime:
                 t.cancel()
 
         if self.request_engine is not None:
-            await self.request_engine.close()
+            self.request_engine.close()
 
 
 class QueueIterator:
