@@ -24,6 +24,7 @@ from hammertime.http import Entry
 from hammertime.ruleset import Heuristics
 
 from aiohttp.test_utils import make_mocked_coro
+from aiohttp import TCPConnector
 import asyncio
 
 
@@ -41,10 +42,12 @@ class TestAioHttpEngine(TestCase):
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=0.2, proxy="http://some.proxy.com/")
 
-    def test_constructor_create_client_session_with_tcp_connector_with_verify_ssl_set_to_false(self):
-        engine = AioHttpEngine(loop=None)
+    def test_constructor_create_client_session_with_connector_argument(self):
+        connector = TCPConnector()
 
-        self.assertFalse(engine.session.connector.verify_ssl)
+        engine = AioHttpEngine(loop=None, connector=connector)
+
+        self.assertEqual(engine.session.connector, connector)
 
 
 class FakeResponse:
