@@ -18,7 +18,7 @@
 import asyncio
 from async_timeout import timeout
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, TCPConnector
 from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
 from ..ruleset import StopRequest, RejectRequest
 
@@ -27,7 +27,8 @@ class AioHttpEngine:
 
     def __init__(self, *, loop):
         self.loop = loop
-        self.session = ClientSession(loop=loop)
+        connector = TCPConnector(verify_ssl=False)
+        self.session = ClientSession(loop=loop, connector=connector)
 
     async def perform(self, entry, heuristics):
         try:

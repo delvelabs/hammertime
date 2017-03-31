@@ -31,15 +31,20 @@ class TestAioHttpEngine(TestCase):
 
     @async_test()
     async def test_perform_use_proxy_of_http_request(self, loop):
+        asyncio.set_event_loop(loop)
         engine = AioHttpEngine(loop=loop)
         engine.session.request = make_mocked_coro(return_value=FakeResponse())
         entry = Entry.create("http://www.example.com/1", proxy="http://some.proxy.com/")
-        asyncio.set_event_loop(loop)
 
         await engine.perform(entry, Heuristics())
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=0.2, proxy="http://some.proxy.com/")
+
+    def test_constructor_create_client_session_with_tcp_connector_with_verify_ssl_set_to_false(self):
+        engine = AioHttpEngine(loop=None)
+
+        self.assertFalse(engine.session.connector.verify_ssl)
 
 
 class FakeResponse:
