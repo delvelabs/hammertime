@@ -122,6 +122,13 @@ class InitTest(TestCase):
 
         self.assertEqual(entry.response.content, "http://example.com/1")
 
+    @async_test()
+    async def test_request_set_proxy_in_http_entry_request(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        entry = await h.request("http://example.com/1", proxy="http://some.proxy.com/")
+
+        self.assertEqual(entry.request.proxy, "http://some.proxy.com/")
+
 
 class FakeEngine(Engine):
 
