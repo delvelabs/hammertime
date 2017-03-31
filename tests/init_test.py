@@ -129,6 +129,14 @@ class InitTest(TestCase):
 
         self.assertEqual(entry.request.proxy, "http://some.proxy.com/")
 
+    @async_test()
+    async def test_request_use_hammertime_proxy_if_not_none_and_proxy_in_request_is_none(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine(), proxy="http://some.proxy.com/")
+
+        entry = await h.request("http://example.com/1")
+
+        self.assertEqual(entry.request.proxy, "http://some.proxy.com/")
+
 
 class FakeEngine(Engine):
 

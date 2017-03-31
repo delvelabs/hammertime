@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class HammerTime:
 
-    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0):
+    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0, proxy=None):
         self.loop = loop
         self.stats = Stats()
 
@@ -39,6 +39,8 @@ class HammerTime:
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
+
+        self.proxy = proxy
 
     @property
     def completed_count(self):
@@ -56,6 +58,8 @@ class HammerTime:
 
     async def _request(self, *args, **kwargs):
         try:
+            if "proxy" not in kwargs:
+                kwargs['proxy'] = self.proxy
             entry = Entry.create(*args, **kwargs)
             entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
             await self.completed_queue.put(entry)
