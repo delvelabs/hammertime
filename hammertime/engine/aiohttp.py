@@ -22,11 +22,19 @@ from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
 from ..ruleset import StopRequest, RejectRequest
 
+from aiohttp.connector import TCPConnector
+import ssl
+
 
 class AioHttpEngine:
 
-    def __init__(self, *, loop, connector=None):
+    def __init__(self, *, loop, verify_ssl=True, ca_certificate_file=None):
         self.loop = loop
+        ssl_context = None
+        if ca_certificate_file is not None:
+            ssl_context = ssl.create_default_context()
+            ssl_context.load_verify_locations(cafile=ca_certificate_file)
+        connector = TCPConnector(loop=loop, verify_ssl=verify_ssl, ssl_context=ssl_context)
         self.session = ClientSession(loop=loop, connector=connector)
 
     async def perform(self, entry, heuristics):

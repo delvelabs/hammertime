@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
+from unittest.mock import patch, MagicMock, call
 from fixtures import async_test
 
 from hammertime.core import HammerTime
@@ -123,14 +124,7 @@ class InitTest(TestCase):
         self.assertEqual(entry.response.content, "http://example.com/1")
 
     @async_test()
-    async def test_request_set_proxy_in_http_entry_request(self, loop):
-        h = HammerTime(loop=loop, request_engine=FakeEngine())
-        entry = await h.request("http://example.com/1", proxy="http://some.proxy.com/")
-
-        self.assertEqual(entry.request.proxy, "http://some.proxy.com/")
-
-    @async_test()
-    async def test_request_use_hammertime_proxy_if_not_none_and_proxy_in_request_is_none(self, loop):
+    async def test_request_set_hammertime_proxy_in_http_entry_request(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine(), proxy="http://some.proxy.com/")
 
         entry = await h.request("http://example.com/1")

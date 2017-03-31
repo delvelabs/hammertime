@@ -40,3 +40,5 @@ def custom_event_loop():
 defaults = Injector(loop=custom_event_loop,
                     request_engine=AioHttpEngine,
                     kb=KnowledgeBase)
+
+

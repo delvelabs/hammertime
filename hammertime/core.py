@@ -21,7 +21,7 @@ import logging
 from collections import deque
 
 from .http import Entry
-from .ruleset import Heuristics, StopRequest, HammerTimeException
+from .ruleset import Heuristics, HammerTimeException
 from .engine import RetryEngine
 
 
@@ -58,9 +58,7 @@ class HammerTime:
 
     async def _request(self, *args, **kwargs):
         try:
-            if "proxy" not in kwargs:
-                kwargs['proxy'] = self.proxy
-            entry = Entry.create(*args, **kwargs)
+            entry = Entry.create(*args, proxy=self.proxy, **kwargs)
             entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
             await self.completed_queue.put(entry)
             return entry

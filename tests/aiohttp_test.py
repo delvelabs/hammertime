@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from fixtures import async_test
 
 from hammertime.engine.aiohttp import AioHttpEngine
@@ -42,12 +42,19 @@ class TestAioHttpEngine(TestCase):
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=0.2, proxy="http://some.proxy.com/")
 
-    def test_constructor_create_client_session_with_connector_argument(self):
-        connector = TCPConnector()
+    def test_constructor_create_client_session_with_connector_with_specified_verify_ssl_value(self):
+        engine_verify_ssl = AioHttpEngine(loop=None, verify_ssl=True)
+        engine_dont_verify_ssl = AioHttpEngine(loop=None, verify_ssl=False)
 
-        engine = AioHttpEngine(loop=None, connector=connector)
+        self.assertTrue(engine_verify_ssl.session.connector.verify_ssl)
+        self.assertFalse(engine_dont_verify_ssl.session.connector.verify_ssl)
 
-        self.assertEqual(engine.session.connector, connector)
+    def test_constructor_load_certification_authority_certificate_in_session_ssl_context(self):
+        with patch("ssl.SSLContext.load_verify_locations", MagicMock()):
+            engine = AioHttpEngine(loop=None, ca_certificate_file="certificate.cer")
+
+            load_verify_locations = engine.session.connector.ssl_context.load_verify_locations
+            load_verify_locations.assert_called_once_with(cafile="certificate.cer")
 
 
 class FakeResponse:
