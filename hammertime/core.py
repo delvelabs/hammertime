@@ -35,12 +35,11 @@ class HammerTime:
         self.stats = Stats()
 
         self.request_engine = RetryEngine(request_engine, loop=loop, stats=self.stats, retry_count=retry_count)
+        self.request_engine.set_proxy(proxy)
         self.heuristics = Heuristics(kb=kb, request_engine=request_engine)
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
-
-        self.proxy = proxy
 
     @property
     def completed_count(self):
@@ -58,7 +57,7 @@ class HammerTime:
 
     async def _request(self, *args, **kwargs):
         try:
-            entry = Entry.create(*args, proxy=self.proxy, **kwargs)
+            entry = Entry.create(*args, **kwargs)
             entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
             await self.completed_queue.put(entry)
             return entry
@@ -105,7 +104,7 @@ class HammerTime:
             await self.request_engine.close()
 
     def set_proxy(self, proxy):
-        self.proxy = proxy
+        self.request_engine.set_proxy(proxy)
 
 
 class QueueIterator:

@@ -30,16 +30,25 @@ import asyncio
 class TestAioHttpEngine(TestCase):
 
     @async_test()
-    async def test_perform_use_proxy_of_http_request(self, loop):
+    async def test_perform_use_proxy_for_request(self, loop):
         asyncio.set_event_loop(loop)
-        engine = AioHttpEngine(loop=loop)
+        engine = AioHttpEngine(loop=loop, proxy="http://some.proxy.com/")
         engine.session.request = make_mocked_coro(return_value=FakeResponse())
-        entry = Entry.create("http://www.example.com/1", proxy="http://some.proxy.com/")
+        entry = Entry.create("http://www.example.com/1")
 
         await engine.perform(entry, Heuristics())
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=0.2, proxy="http://some.proxy.com/")
+
+    @async_test()
+    async def test_set_proxy(self, loop):
+        engine = AioHttpEngine(loop=loop)
+        proxy_address = "http://some.proxy.com"
+
+        engine.set_proxy(proxy_address)
+
+        self.assertEqual(engine.proxy, proxy_address)
 
     def test_constructor_create_client_session_with_connector_with_specified_verify_ssl_value(self):
         engine_verify_ssl = AioHttpEngine(loop=None, verify_ssl=True)

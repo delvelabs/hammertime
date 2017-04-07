@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
+from unittest.mock import MagicMock
 from fixtures import async_test
 
 from hammertime.core import HammerTime
@@ -123,12 +124,21 @@ class InitTest(TestCase):
         self.assertEqual(entry.response.content, "http://example.com/1")
 
     @async_test()
-    async def test_request_set_hammertime_proxy_in_http_entry_request(self, loop):
-        h = HammerTime(loop=loop, request_engine=FakeEngine(), proxy="http://some.proxy.com/")
+    async def test_constructor_set_aiohttp_engine_proxy(self, loop):
+        h = HammerTime(loop=loop, request_engine=MagicMock(), proxy="http://some.proxy.com/")
 
-        entry = await h.request("http://example.com/1")
+        aiohttp_engine = h.request_engine.request_engine
 
-        self.assertEqual(entry.request.proxy, "http://some.proxy.com/")
+        aiohttp_engine.set_proxy.assert_called_once_with("http://some.proxy.com/")
+
+    @async_test()
+    async def test_set_proxy_set_aiohttp_engine_proxy(self, loop):
+        h = HammerTime(loop=loop, request_engine=MagicMock())
+
+        h.set_proxy("http://some.proxy.com/")
+
+        aiohttp_engine = h.request_engine.request_engine
+        aiohttp_engine.set_proxy.assert_called_with("http://some.proxy.com/")
 
 
 class FakeEngine(Engine):
@@ -141,6 +151,9 @@ class FakeEngine(Engine):
         await heuristics.after_response(entry)
 
         return entry
+
+    def set_proxy(self, proxy):
+        pass
 
 
 class BlockRequest:

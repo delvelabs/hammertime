@@ -28,7 +28,7 @@ from ..ruleset import StopRequest, RejectRequest
 
 class AioHttpEngine:
 
-    def __init__(self, *, loop, verify_ssl=True, ca_certificate_file=None):
+    def __init__(self, *, loop, verify_ssl=True, ca_certificate_file=None, proxy=None):
         self.loop = loop
         ssl_context = None
         if ca_certificate_file is not None:
@@ -36,6 +36,7 @@ class AioHttpEngine:
             ssl_context.load_verify_locations(cafile=ca_certificate_file)
         connector = TCPConnector(loop=loop, verify_ssl=verify_ssl, ssl_context=ssl_context)
         self.session = ClientSession(loop=loop, connector=connector)
+        self.proxy = proxy
 
     async def perform(self, entry, heuristics):
         try:
@@ -55,7 +56,7 @@ class AioHttpEngine:
         req = entry.request
 
         with timeout(0.5, loop=self.loop):
-            response = await self.session.request(method=req.method, url=req.url, timeout=0.2, proxy=req.proxy)
+            response = await self.session.request(method=req.method, url=req.url, timeout=0.2, proxy=self.proxy)
 
         # When the request is simply rejected, we want to keep the persistent connection alive
         async with ProtectedSession(response, RejectRequest):
@@ -75,6 +76,9 @@ class AioHttpEngine:
 
     async def close(self):
         self.session.close()
+
+    def set_proxy(self, proxy):
+        self.proxy = proxy
 
 
 class ProtectedSession:

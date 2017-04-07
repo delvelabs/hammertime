@@ -27,10 +27,9 @@ Entry.create = lambda *args, response=None, arguments=None, **kwargs: Entry(requ
 
 class Request:
 
-    def __init__(self, url, *, method='GET', proxy=None):
+    def __init__(self, url, *, method='GET'):
         self.method = method
         self.url = url
-        self.proxy = proxy
 
 
 class Result:
