@@ -24,6 +24,7 @@ from hammertime.engine import Engine
 from hammertime.http import StaticResponse
 from hammertime.ruleset import StopRequest, RejectRequest
 from hammertime.rules import RejectStatusCode
+from hammertime.engine.aiohttp import AioHttpEngine
 
 
 class InitTest(TestCase):
@@ -124,12 +125,21 @@ class InitTest(TestCase):
         self.assertEqual(entry.response.content, "http://example.com/1")
 
     @async_test()
-    async def test_constructor_set_aiohttp_engine_proxy(self, loop):
+    async def test_constructor_set_aiohttp_engine_proxy_if_constructor_proxy_is_not_none(self, loop):
         h = HammerTime(loop=loop, request_engine=MagicMock(), proxy="http://some.proxy.com/")
 
         aiohttp_engine = h.request_engine.request_engine
 
         aiohttp_engine.set_proxy.assert_called_once_with("http://some.proxy.com/")
+
+    @async_test()
+    async def test_constructor_do_not_overwrite_aiohttp_engine_proxy_if_constructor_proxy_is_none(self, loop):
+        engine = AioHttpEngine(loop=loop, proxy="http://some.proxy.com")
+        h = HammerTime(loop=loop, request_engine=engine)
+
+        aiohttp_engine = h.request_engine.request_engine
+
+        self.assertEqual(aiohttp_engine.proxy, "http://some.proxy.com")
 
     @async_test()
     async def test_set_proxy_set_aiohttp_engine_proxy(self, loop):
