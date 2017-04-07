@@ -20,10 +20,10 @@ from async_timeout import timeout
 
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
-from ..ruleset import StopRequest, RejectRequest
-
 from aiohttp.connector import TCPConnector
 import ssl
+
+from ..ruleset import StopRequest, RejectRequest
 
 
 class AioHttpEngine:
