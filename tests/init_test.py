@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import patch, MagicMock, call
 from fixtures import async_test
 
 from hammertime.core import HammerTime

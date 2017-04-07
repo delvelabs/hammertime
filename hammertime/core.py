@@ -104,6 +104,9 @@ class HammerTime:
         if self.request_engine is not None:
             await self.request_engine.close()
 
+    def set_proxy(self, proxy):
+        self.proxy = proxy
+
 
 class QueueIterator:
 

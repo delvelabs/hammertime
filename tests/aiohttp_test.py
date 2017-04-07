@@ -24,7 +24,6 @@ from hammertime.http import Entry
 from hammertime.ruleset import Heuristics
 
 from aiohttp.test_utils import make_mocked_coro
-from aiohttp import TCPConnector
 import asyncio
 
 
