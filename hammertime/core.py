@@ -21,7 +21,7 @@ import logging
 from collections import deque
 
 from .http import Entry
-from .ruleset import Heuristics, StopRequest, HammerTimeException
+from .ruleset import Heuristics, HammerTimeException
 from .engine import RetryEngine
 
 
@@ -30,11 +30,13 @@ logger = logging.getLogger(__name__)
 
 class HammerTime:
 
-    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0):
+    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0, proxy=None):
         self.loop = loop
         self.stats = Stats()
 
         self.request_engine = RetryEngine(request_engine, loop=loop, stats=self.stats, retry_count=retry_count)
+        if proxy is not None:
+            self.request_engine.set_proxy(proxy)
         self.heuristics = Heuristics(kb=kb, request_engine=request_engine)
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
@@ -101,6 +103,9 @@ class HammerTime:
 
         if self.request_engine is not None:
             await self.request_engine.close()
+
+    def set_proxy(self, proxy):
+        self.request_engine.set_proxy(proxy)
 
 
 class QueueIterator:
