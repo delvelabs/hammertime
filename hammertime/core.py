@@ -62,7 +62,7 @@ class HammerTime:
             entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
             await self.completed_queue.put(entry)
             return entry
-        except HammerTimeException:
+        except (HammerTimeException, asyncio.CancelledError):
             raise
         except Exception as e:
             logger.exception(e)
@@ -89,7 +89,7 @@ class HammerTime:
     def _drain(self, task):
         try:
             task.result()
-        except HammerTimeException:
+        except (HammerTimeException, asyncio.CancelledError):
             pass
         except Exception as e:
             logger.exception(e)
