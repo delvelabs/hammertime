@@ -21,6 +21,7 @@ from unittest.mock import MagicMock
 from fixtures import async_test
 from hammertime.ruleset import RuleSet, Heuristics, StopRequest
 from hammertime.http import Entry
+from aiohttp.test_utils import make_mocked_coro
 
 
 class RuleSetTest(TestCase):
@@ -33,10 +34,8 @@ class RuleSetTest(TestCase):
 
     @async_test()
     async def test_rules_triggered(self, fake_future):
-        r1 = MagicMock(autospec=lambda entry: None)
-        r1.return_value = fake_future(None)
-        r2 = MagicMock(autospec=lambda entry: None)
-        r2.return_value = fake_future(None)
+        r1 = make_mocked_coro(return_value=fake_future(None))
+        r2 = make_mocked_coro(return_value=fake_future(None))
 
         rs = RuleSet()
         rs.add(r1)
@@ -52,9 +51,8 @@ class RuleSetTest(TestCase):
 
     @async_test()
     async def test_failure_interrupts(self, fake_future):
-        r1 = MagicMock(autospec=lambda entry: None)
-        r1.side_effect = StopRequest()
-        r2 = MagicMock(autospec=lambda entry: None)
+        r1 = make_mocked_coro(raise_exception=StopRequest())
+        r2 = make_mocked_coro()
 
         rs = RuleSet()
         rs.add(r1)
