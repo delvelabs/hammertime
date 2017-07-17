@@ -51,6 +51,9 @@ class AioHttpEngine:
             raise StopRequest("Connection Error")
         except ServerDisconnectedError:
             raise StopRequest("Server Disconnected")
+        # If request is cancelled, it raises a KeyError. If session is closed, session.request raises a RuntimeError.
+        except (KeyError, RuntimeError, asyncio.CancelledError):
+            raise asyncio.CancelledError
 
     async def _perform(self, entry, heuristics):
         req = entry.request
