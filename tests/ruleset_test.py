@@ -16,12 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fixtures import async_test
 from hammertime.ruleset import RuleSet, Heuristics, StopRequest
 from hammertime.http import Entry
 from aiohttp.test_utils import make_mocked_coro
+import asyncio
 
 
 class RuleSetTest(TestCase):
@@ -38,16 +39,17 @@ class RuleSetTest(TestCase):
         r2 = make_mocked_coro(return_value=fake_future(None))
 
         rs = RuleSet()
-        rs.add(r1)
-        rs.add(r2)
-        self.assertEqual(2, len(rs))
+        with patch('asyncio.iscoroutinefunction', MagicMock(return_value=True)):
+            rs.add(r1)
+            rs.add(r2)
+            self.assertEqual(2, len(rs))
 
-        entry = Entry.create('http://example.com')
+            entry = Entry.create('http://example.com')
 
-        await rs.accept(entry)
+            await rs.accept(entry)
 
-        r1.assert_called_with(entry)
-        r2.assert_called_with(entry)
+            r1.assert_called_with(entry)
+            r2.assert_called_with(entry)
 
     @async_test()
     async def test_failure_interrupts(self, fake_future):
@@ -55,16 +57,17 @@ class RuleSetTest(TestCase):
         r2 = make_mocked_coro()
 
         rs = RuleSet()
-        rs.add(r1)
-        rs.add(r2)
+        with patch('asyncio.iscoroutinefunction', MagicMock(return_value=True)):
+            rs.add(r1)
+            rs.add(r2)
 
-        entry = Entry.create('http://example.com')
+            entry = Entry.create('http://example.com')
 
-        with self.assertRaises(StopRequest):
-            await rs.accept(entry)
+            with self.assertRaises(StopRequest):
+                await rs.accept(entry)
 
-        r1.assert_called_with(entry)
-        r2.assert_not_called()
+            r1.assert_called_with(entry)
+            r2.assert_not_called()
 
 
 class HeuristicsTest(TestCase):
