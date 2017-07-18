@@ -167,6 +167,26 @@ class InitTest(TestCase):
 
         self.assertEqual(successful_requests, [])
 
+    @async_test()
+    async def test_request_raise_cancelled_error_if_hammertime_is_close(self, loop):
+        hammertime = HammerTime(loop=loop)
+
+        await hammertime.close()
+
+        self.assertTrue(hammertime.is_closed)
+        with self.assertRaises(asyncio.CancelledError):
+            hammertime.request("http://example.com")
+
+    @async_test()
+    async def test_interrupt_close_hammertime(self, loop):
+        hammertime = HammerTime(loop=loop)
+
+        hammertime._interrupt()
+        # Wait for hammertime.close to be called.
+        await hammertime.closed
+
+        self.assertTrue(hammertime.is_closed)
+
 
 class FakeEngine(Engine):
 

@@ -23,6 +23,7 @@ from collections import deque
 from .http import Entry
 from .ruleset import Heuristics, HammerTimeException
 from .engine import RetryEngine
+import signal
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,8 @@ class HammerTime:
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
+        self.closed = asyncio.Future(loop=loop)
+        self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
 
     @property
     def completed_count(self):
@@ -50,7 +53,13 @@ class HammerTime:
     def requested_count(self):
         return self.stats.requested
 
+    @property
+    def is_closed(self):
+        return self.closed.done()
+
     def request(self, *args, **kwargs):
+        if self.is_closed:
+            raise asyncio.CancelledError()
         self.stats.requested += 1
         task = self.loop.create_task(self._request(*args, **kwargs))
         self.tasks.append(task)
@@ -95,17 +104,22 @@ class HammerTime:
             logger.exception(e)
 
     async def close(self):
-        for t in self.tasks:
-            if t.done():
-                self._drain(t)
-            else:
-                t.cancel()
+        if not self.is_closed:
+            for t in self.tasks:
+                if t.done():
+                    self._drain(t)
+                else:
+                    t.cancel()
 
-        if self.request_engine is not None:
-            await self.request_engine.close()
+            if self.request_engine is not None:
+                await self.request_engine.close()
+            self.closed.set_result(None)
 
     def set_proxy(self, proxy):
         self.request_engine.set_proxy(proxy)
+
+    def _interrupt(self):
+        asyncio.ensure_future(self.close(), loop=self.loop)
 
 
 class QueueIterator:
