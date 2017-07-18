@@ -42,7 +42,7 @@ class HammerTime:
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
-        self._closed = asyncio.Future(loop=loop)
+        self.closed = asyncio.Future(loop=loop)
         self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
 
     @property
@@ -55,7 +55,7 @@ class HammerTime:
 
     @property
     def is_closed(self):
-        return self._closed.done()
+        return self.closed.done()
 
     def request(self, *args, **kwargs):
         if self.is_closed:
@@ -113,7 +113,7 @@ class HammerTime:
 
             if self.request_engine is not None:
                 await self.request_engine.close()
-            self._closed.set_result(None)
+            self.closed.set_result(None)
 
     def set_proxy(self, proxy):
         self.request_engine.set_proxy(proxy)

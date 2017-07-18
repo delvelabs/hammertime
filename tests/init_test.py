@@ -183,7 +183,7 @@ class InitTest(TestCase):
 
         hammertime._interrupt()
         # Wait for hammertime.close to be called.
-        await hammertime._closed
+        await hammertime.closed
 
         self.assertTrue(hammertime.is_closed)
 
