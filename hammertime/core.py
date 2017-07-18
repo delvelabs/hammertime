@@ -23,6 +23,7 @@ from collections import deque
 from .http import Entry
 from .ruleset import Heuristics, HammerTimeException
 from .engine import RetryEngine
+import signal
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,8 @@ class HammerTime:
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
+        self._is_closed = False
+        self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
 
     @property
     def completed_count(self):
@@ -51,6 +54,8 @@ class HammerTime:
         return self.stats.requested
 
     def request(self, *args, **kwargs):
+        if self._is_closed:
+            raise asyncio.CancelledError()
         self.stats.requested += 1
         task = self.loop.create_task(self._request(*args, **kwargs))
         self.tasks.append(task)
@@ -103,9 +108,13 @@ class HammerTime:
 
         if self.request_engine is not None:
             await self.request_engine.close()
+        self._is_closed = True
 
     def set_proxy(self, proxy):
         self.request_engine.set_proxy(proxy)
+
+    def _interrupt(self):
+        asyncio.ensure_future(self.close(), loop=self.loop)
 
 
 class QueueIterator:
