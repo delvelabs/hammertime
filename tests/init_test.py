@@ -25,6 +25,8 @@ from hammertime.http import StaticResponse
 from hammertime.ruleset import StopRequest, RejectRequest
 from hammertime.rules import RejectStatusCode
 from hammertime.engine.aiohttp import AioHttpEngine
+import asyncio
+from aiohttp.test_utils import make_mocked_coro
 
 
 class InitTest(TestCase):
@@ -149,6 +151,21 @@ class InitTest(TestCase):
 
         aiohttp_engine = h.request_engine.request_engine
         aiohttp_engine.set_proxy.assert_called_with("http://some.proxy.com/")
+
+    @async_test()
+    async def test_no_successful_request_returned_when_requests_are_cancelled(self, loop):
+        engine = MagicMock()
+        engine.perform = make_mocked_coro(raise_exception=asyncio.CancelledError)
+        hammertime = HammerTime(loop=loop, request_engine=engine)
+
+        for i in range(5):
+            hammertime.request("http://example.com")
+
+        successful_requests = []
+        async for request in hammertime.successful_requests():
+            successful_requests.append(request)
+
+        self.assertEqual(successful_requests, [])
 
 
 class FakeEngine(Engine):
