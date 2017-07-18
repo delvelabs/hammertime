@@ -173,7 +173,7 @@ class InitTest(TestCase):
 
         await hammertime.close()
 
-        self.assertTrue(hammertime._is_closed)
+        self.assertTrue(hammertime.is_closed)
         with self.assertRaises(asyncio.CancelledError):
             hammertime.request("http://example.com")
 
@@ -183,9 +183,9 @@ class InitTest(TestCase):
 
         hammertime._interrupt()
         # Wait for hammertime.close to be called.
-        await asyncio.wait(asyncio.Task.all_tasks(loop=loop), loop=loop, return_when=asyncio.FIRST_COMPLETED)
+        await hammertime._closed
 
-        self.assertTrue(hammertime._is_closed)
+        self.assertTrue(hammertime.is_closed)
 
 
 class FakeEngine(Engine):
