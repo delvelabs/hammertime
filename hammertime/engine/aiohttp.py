@@ -100,6 +100,8 @@ class ProtectedSession:
 
     async def __aexit__(self, exc_type, exc, tb):
         if exc_type == self.exception_class:
+            # Read content before releasing response to keep its connection alive.
+            await self.context.read()
             # Simple release
             await self.context.__aexit__(None, None, None)
         else:
