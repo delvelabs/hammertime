@@ -22,7 +22,7 @@ Entry = namedtuple('Entry', ['request', 'response', 'result', 'arguments'])
 Entry.create = lambda *args, response=None, arguments=None, **kwargs: Entry(request=Request(*args, **kwargs),
                                                                             response=response,
                                                                             result=Result(),
-                                                                            arguments=arguments)
+                                                                            arguments=arguments or {})
 
 
 class Request:
