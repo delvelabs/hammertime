@@ -64,6 +64,18 @@ class TestAioHttpEngine(TestCase):
             load_verify_locations = engine.session.connector.ssl_context.load_verify_locations
             load_verify_locations.assert_called_once_with(cafile="certificate.cer")
 
+    @async_test()
+    async def test_perform_use_timeout_of_entry_if_not_none(self, loop):
+        asyncio.set_event_loop(loop)
+        engine = AioHttpEngine(loop=loop, proxy="http://some.proxy.com/")
+        engine.session.request = make_mocked_coro(return_value=FakeResponse())
+        entry = Entry.create("http://www.example.com/1", arguments={"timeout": 10})
+
+        await engine.perform(entry, Heuristics())
+
+        engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
+                                                       timeout=10, proxy="http://some.proxy.com/")
+
 
 class FakeResponse:
 

@@ -60,8 +60,8 @@ class AioHttpEngine:
         req = entry.request
 
         with timeout(self.timeout + 0.3, loop=self.loop):
-            response = await self.session.request(method=req.method, url=req.url, timeout=self.timeout,
-                                                  proxy=self.proxy)
+            response = await self.session.request(method=req.method, url=req.url, proxy=self.proxy,
+                                                  timeout=entry.arguments.get("timeout", self.timeout))
 
         # When the request is simply rejected, we want to keep the persistent connection alive
         async with ProtectedSession(response, RejectRequest):

@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 from fixtures import async_test
@@ -156,3 +157,17 @@ class DynamicTimeoutTest(TestCase):
         await self.rule.before_request(entry)
 
         self.assertEqual(entry.arguments["timeout"], mean(delays) * 2 + stdev(delays) * 2)
+
+    @async_test()
+    async def test_erase_old_data(self):
+        delays = [self.min_timeout] * self.sample_size * 5
+        self.knowledge_base.timeout_manager.request_delays = delays
+        self.knowledge_base.timeout_manager.requests_successful = [True] * self.sample_size * 5
+        entry = self.entry_factory()
+
+        await self.rule.before_request(entry)
+        await self.rule.after_headers(entry)
+        await self.rule.before_request(entry)
+
+        self.assertEqual(len(self.knowledge_base.timeout_manager.request_delays), self.sample_size)
+        self.assertEqual(len(self.knowledge_base.timeout_manager.requests_successful), self.sample_size)

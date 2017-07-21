@@ -86,5 +86,8 @@ class TimeoutManager:
         else:
             delays = self.request_delays[-self.samples_length:]
             timeout = mean(delays) * 2 + stdev(delays) * 4
+            if len(self.request_delays) > self.samples_length * 5:
+                self.request_delays = delays
+                self.requests_successful = self.requests_successful[-self.samples_length:]
         timeout = max(self.min_timeout, timeout)
         return min(timeout, self.max_timeout)
