@@ -139,15 +139,15 @@ class DynamicTimeoutTest(TestCase):
 
     @async_test()
     async def test_erase_last_failure_if_no_failure_after_long_time(self):
-        delays = [self.min_timeout] * self.sample_size * 5
+        delays = [self.min_timeout] * (self.sample_size * 5 + 1)
         self.knowledge_base.timeout_manager.request_delays = delays
-        self.knowledge_base.timeout_manager.requests_successful = [True] * self.sample_size * 5
+        self.knowledge_base.timeout_manager.requests_successful = [True] * (self.sample_size * 5 + 1)
         self.knowledge_base.timeout_manager.last_retry_timeout = self.max_timeout
         entry = self.entry_factory()
 
         await self.rule.before_request(entry)
 
-        self.assertEqual(entry.arguments["timeout"], mean(delays) * 2 + stdev(delays) * 2)
+        self.assertIsNone(self.knowledge_base.timeout_manager.last_retry_timeout)
 
     @async_test()
     async def test_erase_old_data(self):

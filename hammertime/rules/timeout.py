@@ -77,9 +77,8 @@ class TimeoutManager:
         self.request_delays.append(delay)
 
     def get_timeout(self):
-        if self.last_retry_timeout is not None and len(self.requests_successful) >= self.samples_length * 5:
-            if all(self.requests_successful[-(self.samples_length * 5):]):
-                self.last_retry_timeout = None
+        if len(self.request_delays) > self.samples_length * 5:
+            self._clean_up_data()
         if self.last_retry_timeout is not None:
             timeout = self.last_retry_timeout * 2
         elif len(self.request_delays) < self.samples_length:
@@ -87,8 +86,11 @@ class TimeoutManager:
         else:
             delays = self.request_delays[-self.samples_length:]
             timeout = mean(delays) * 2 + stdev(delays) * 4
-            if len(self.request_delays) > self.samples_length * 5:
-                self.request_delays = delays
-                self.requests_successful = self.requests_successful[-self.samples_length:]
         timeout = max(self.min_timeout, timeout)
         return min(timeout, self.max_timeout)
+
+    def _clean_up_data(self):
+        if all(self.requests_successful):
+            self.last_retry_timeout = None
+        self.requests_successful = self.requests_successful[-self.samples_length:]
+        self.request_delays = self.request_delays[-self.samples_length:]
