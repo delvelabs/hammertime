@@ -17,9 +17,11 @@
 
 from .status import RejectStatusCode
 from .body import IgnoreLargeBody
+from .timeout import DynamicTimeout
 
 
 __all__ = [
     RejectStatusCode,
     IgnoreLargeBody,
+    DynamicTimeout
 ]
