@@ -62,9 +62,9 @@ class DynamicTimeoutTest(TestCase):
     @async_test()
     async def test_before_request_augment_timeout_if_request_failed(self):
         entry = self.entry_factory()
-        entry.result.attempt = 2
         timeout = 1
         entry.arguments["timeout"] = timeout
+        await self.rule.on_timeout(entry)
 
         await self.rule.before_request(entry)
 
@@ -73,9 +73,9 @@ class DynamicTimeoutTest(TestCase):
     @async_test()
     async def test_timeout_dont_exceed_max(self):
         entry = self.entry_factory()
-        entry.result.attempt = 2
         timeout = self.max_timeout
         entry.arguments["timeout"] = timeout
+        await self.rule.on_timeout(entry)
 
         await self.rule.before_request(entry)
 
@@ -91,12 +91,11 @@ class DynamicTimeoutTest(TestCase):
         self.assertEqual(entry.arguments["timeout"], self.min_timeout)
 
     @async_test()
-    async def test_before_request_add_failed_request_to_knowledge_base_if_entry_is_retry(self):
+    async def test_on_timeout_add_failed_request_to_knowledge_base(self):
         entry = self.entry_factory()
-        entry.result.attempt = 2
         entry.arguments["timeout"] = 1
 
-        await self.rule.before_request(entry)
+        await self.rule.on_timeout(entry)
 
         self.assertEqual(self.knowledge_base.timeout_manager.requests_successful, [False])
 
@@ -108,14 +107,6 @@ class DynamicTimeoutTest(TestCase):
             await self.rule.before_request(entry)
 
             self.assertEqual(entry.arguments["start_time"], 100)
-
-    @async_test()
-    async def test_before_request_set_request_engine_timeout(self):
-        entry = self.entry_factory()
-
-        await self.rule.before_request(entry)
-
-        self.assertEqual(self.fake_engine.timeout, self.knowledge_base.timeout_manager.get_timeout())
 
     @async_test()
     async def test_before_request_use_max_timeout_if_last_attempt(self):

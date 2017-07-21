@@ -45,6 +45,7 @@ class AioHttpEngine:
 
             return await self._perform(entry, heuristics)
         except (asyncio.TimeoutError, asyncio.CancelledError):
+            await heuristics.on_timeout(entry)
             raise StopRequest("Timeout reached")
         except ClientOSError:
             raise StopRequest("Host Unreachable")

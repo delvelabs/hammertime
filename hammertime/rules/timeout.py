@@ -36,9 +36,7 @@ class DynamicTimeout:
         self.request_engine = request_engine
 
     async def before_request(self, entry):
-        if self._is_retry(entry):
-            self.timeout_manager.add_failed_request(entry)
-        if entry.result.attempt > self.retries:
+        if self._is_last_attempt(entry):
             entry.arguments["timeout"] = self.max_timeout
         else:
             entry.arguments["timeout"] = self.timeout_manager.get_timeout()
@@ -48,8 +46,11 @@ class DynamicTimeout:
     async def after_headers(self, entry):
         self.timeout_manager.add_successful_request(entry)
 
-    def _is_retry(self, entry):
-        return entry.result.attempt != 1
+    async def on_timeout(self, entry):
+        self.timeout_manager.add_failed_request(entry)
+
+    def _is_last_attempt(self, entry):
+        return entry.result.attempt > self.retries
 
 
 class TimeoutManager:
