@@ -15,4 +15,6 @@ setup(name='HammerTime',
           'aiohttp',
           'async_timeout',
           'easyinject',
-      ])
+      ],
+      license="GPLv2"
+     )
