@@ -17,10 +17,12 @@
 
 from .status import RejectStatusCode, DetectFalse404
 from .body import IgnoreLargeBody
+from .timeout import DynamicTimeout
 
 
 __all__ = [
     DetectFalse404,
     RejectStatusCode,
     IgnoreLargeBody,
+    DynamicTimeout
 ]

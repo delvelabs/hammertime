@@ -21,8 +21,9 @@ import logging
 from collections import deque
 
 from .http import Entry
-from .ruleset import Heuristics, StopRequest, HammerTimeException
+from .ruleset import Heuristics, HammerTimeException
 from .engine import RetryEngine
+import signal
 
 
 logger = logging.getLogger(__name__)
@@ -30,15 +31,19 @@ logger = logging.getLogger(__name__)
 
 class HammerTime:
 
-    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0):
+    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0, proxy=None):
         self.loop = loop
         self.stats = Stats()
 
         self.request_engine = RetryEngine(request_engine, loop=loop, stats=self.stats, retry_count=retry_count)
+        if proxy is not None:
+            self.request_engine.set_proxy(proxy)
         self.heuristics = Heuristics(kb=kb, request_engine=self.request_engine)
 
         self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
+        self.closed = asyncio.Future(loop=loop)
+        self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
 
     @property
     def completed_count(self):
@@ -48,7 +53,13 @@ class HammerTime:
     def requested_count(self):
         return self.stats.requested
 
+    @property
+    def is_closed(self):
+        return self.closed.done()
+
     def request(self, *args, **kwargs):
+        if self.is_closed:
+            raise asyncio.CancelledError()
         self.stats.requested += 1
         task = self.loop.create_task(self._request(*args, **kwargs))
         self.tasks.append(task)
@@ -60,7 +71,7 @@ class HammerTime:
             entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
             await self.completed_queue.put(entry)
             return entry
-        except HammerTimeException:
+        except (HammerTimeException, asyncio.CancelledError):
             raise
         except Exception as e:
             logger.exception(e)
@@ -87,20 +98,28 @@ class HammerTime:
     def _drain(self, task):
         try:
             task.result()
-        except HammerTimeException:
+        except (HammerTimeException, asyncio.CancelledError):
             pass
         except Exception as e:
             logger.exception(e)
 
     async def close(self):
-        for t in self.tasks:
-            if t.done():
-                self._drain(t)
-            else:
-                t.cancel()
+        if not self.is_closed:
+            for t in self.tasks:
+                if t.done():
+                    self._drain(t)
+                else:
+                    t.cancel()
 
-        if self.request_engine is not None:
-            await self.request_engine.close()
+            if self.request_engine is not None:
+                await self.request_engine.close()
+            self.closed.set_result(None)
+
+    def set_proxy(self, proxy):
+        self.request_engine.set_proxy(proxy)
+
+    def _interrupt(self):
+        asyncio.ensure_future(self.close(), loop=self.loop)
 
 
 class QueueIterator:

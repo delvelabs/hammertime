@@ -18,10 +18,11 @@
 from collections import namedtuple
 
 
-Entry = namedtuple('Entry', ['request', 'response', 'result'])
-Entry.create = lambda *args, response=None, **kwargs: Entry(request=Request(*args, **kwargs),
-                                                            response=response,
-                                                            result=Result())
+Entry = namedtuple('Entry', ['request', 'response', 'result', 'arguments'])
+Entry.create = lambda *args, response=None, arguments=None, **kwargs: Entry(request=Request(*args, **kwargs),
+                                                                            response=response,
+                                                                            result=Result(),
+                                                                            arguments=arguments or {})
 
 
 class Request:

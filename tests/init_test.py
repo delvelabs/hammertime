@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
+from unittest.mock import MagicMock
 from fixtures import async_test
 
 from hammertime.core import HammerTime
@@ -23,6 +24,9 @@ from hammertime.engine import Engine
 from hammertime.http import StaticResponse
 from hammertime.ruleset import StopRequest, RejectRequest
 from hammertime.rules import RejectStatusCode
+from hammertime.engine.aiohttp import AioHttpEngine
+import asyncio
+from aiohttp.test_utils import make_mocked_coro
 
 
 class InitTest(TestCase):
@@ -40,6 +44,12 @@ class InitTest(TestCase):
         entry = await h.request("http://example.com")
         self.assertEqual(entry.response.content, "http://example.com")
         await h.close()
+
+    @async_test()
+    async def test_preserve_arguments(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        entry = await h.request("http://example.com", arguments={"hello": "world"})
+        self.assertEqual(entry.arguments["hello"], "world")
 
     @async_test()
     async def test_wait_for_multiple_requests(self, loop):
@@ -112,9 +122,70 @@ class InitTest(TestCase):
     async def test_retries_performed_and_response_obtained(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine(), retry_count=2)
         h.heuristics.add(BlockRequest("http://example.com/1"))
-        _, resp, result = await h.request("http://example.com/1")
+        entry = await h.request("http://example.com/1")
 
-        self.assertEqual(resp.content, "http://example.com/1")
+        self.assertEqual(entry.response.content, "http://example.com/1")
+
+    @async_test()
+    async def test_constructor_set_aiohttp_engine_proxy_if_constructor_proxy_is_not_none(self, loop):
+        h = HammerTime(loop=loop, request_engine=MagicMock(), proxy="http://some.proxy.com/")
+
+        aiohttp_engine = h.request_engine.request_engine
+
+        aiohttp_engine.set_proxy.assert_called_once_with("http://some.proxy.com/")
+
+    @async_test()
+    async def test_constructor_do_not_overwrite_aiohttp_engine_proxy_if_constructor_proxy_is_none(self, loop):
+        engine = AioHttpEngine(loop=loop, proxy="http://some.proxy.com")
+        h = HammerTime(loop=loop, request_engine=engine)
+
+        aiohttp_engine = h.request_engine.request_engine
+
+        self.assertEqual(aiohttp_engine.proxy, "http://some.proxy.com")
+
+    @async_test()
+    async def test_set_proxy_set_aiohttp_engine_proxy(self, loop):
+        h = HammerTime(loop=loop, request_engine=MagicMock())
+
+        h.set_proxy("http://some.proxy.com/")
+
+        aiohttp_engine = h.request_engine.request_engine
+        aiohttp_engine.set_proxy.assert_called_with("http://some.proxy.com/")
+
+    @async_test()
+    async def test_no_successful_request_returned_when_requests_are_cancelled(self, loop):
+        engine = MagicMock()
+        engine.perform = make_mocked_coro(raise_exception=asyncio.CancelledError)
+        hammertime = HammerTime(loop=loop, request_engine=engine)
+
+        for i in range(5):
+            hammertime.request("http://example.com")
+
+        successful_requests = []
+        async for request in hammertime.successful_requests():
+            successful_requests.append(request)
+
+        self.assertEqual(successful_requests, [])
+
+    @async_test()
+    async def test_request_raise_cancelled_error_if_hammertime_is_close(self, loop):
+        hammertime = HammerTime(loop=loop)
+
+        await hammertime.close()
+
+        self.assertTrue(hammertime.is_closed)
+        with self.assertRaises(asyncio.CancelledError):
+            hammertime.request("http://example.com")
+
+    @async_test()
+    async def test_interrupt_close_hammertime(self, loop):
+        hammertime = HammerTime(loop=loop)
+
+        hammertime._interrupt()
+        # Wait for hammertime.close to be called.
+        await hammertime.closed
+
+        self.assertTrue(hammertime.is_closed)
 
 
 class FakeEngine(Engine):
@@ -127,6 +198,9 @@ class FakeEngine(Engine):
         await heuristics.after_response(entry)
 
         return entry
+
+    def set_proxy(self, proxy):
+        pass
 
 
 class BlockRequest:

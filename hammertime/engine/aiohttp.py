@@ -19,15 +19,25 @@ import asyncio
 from async_timeout import timeout
 
 from aiohttp import ClientSession
-from aiohttp.errors import ClientOSError
+from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
+from aiohttp.connector import TCPConnector
+import ssl
+
 from ..ruleset import StopRequest, RejectRequest
 
 
 class AioHttpEngine:
 
-    def __init__(self, *, loop):
+    def __init__(self, *, loop, verify_ssl=True, ca_certificate_file=None, proxy=None, timeout=0.2):
         self.loop = loop
-        self.session = ClientSession(loop=loop)
+        ssl_context = None
+        if ca_certificate_file is not None:
+            ssl_context = ssl.create_default_context()
+            ssl_context.load_verify_locations(cafile=ca_certificate_file)
+        connector = TCPConnector(loop=loop, verify_ssl=verify_ssl, ssl_context=ssl_context)
+        self.session = ClientSession(loop=loop, connector=connector)
+        self.proxy = proxy
+        self.timeout = timeout
 
     async def perform(self, entry, heuristics):
         try:
@@ -35,15 +45,25 @@ class AioHttpEngine:
 
             return await self._perform(entry, heuristics)
         except (asyncio.TimeoutError, asyncio.CancelledError):
+            await heuristics.on_timeout(entry)
             raise StopRequest("Timeout reached")
-        except (ClientOSError):
+        except ClientOSError:
             raise StopRequest("Host Unreachable")
+        except ClientResponseError:
+            raise StopRequest("Connection Error")
+        except ServerDisconnectedError:
+            raise StopRequest("Server Disconnected")
+        # If request is cancelled, it raises a KeyError. If session is closed, session.request raises a RuntimeError.
+        except (KeyError, RuntimeError, asyncio.CancelledError):
+            raise asyncio.CancelledError
 
     async def _perform(self, entry, heuristics):
         req = entry.request
 
-        with timeout(0.5, loop=self.loop):
-            response = await self.session.request(method=req.method, url=req.url, timeout=0.2)
+        timeout_value = entry.arguments.get("timeout", self.timeout)
+        with timeout(timeout_value + 0.3, loop=self.loop):
+            response = await self.session.request(method=req.method, url=req.url, proxy=self.proxy,
+                                                  timeout=timeout_value)
 
         # When the request is simply rejected, we want to keep the persistent connection alive
         async with ProtectedSession(response, RejectRequest):
@@ -62,7 +82,10 @@ class AioHttpEngine:
         return entry
 
     async def close(self):
-        await self.session.close()
+        self.session.close()
+
+    def set_proxy(self, proxy):
+        self.proxy = proxy
 
 
 class ProtectedSession:
@@ -81,6 +104,8 @@ class ProtectedSession:
 
     async def __aexit__(self, exc_type, exc, tb):
         if exc_type == self.exception_class:
+            # Read content before releasing response to keep its connection alive.
+            await self.context.read()
             # Simple release
             await self.context.__aexit__(None, None, None)
         else:
