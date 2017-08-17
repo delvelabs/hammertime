@@ -93,13 +93,13 @@ class DetectSoft404Test(TestCase):
 
         await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
 
-        self.assertEqual(self.kb.page_not_found_response["http://example.com/"],
+        self.assertEqual(self.kb.soft_404_responses["http://example.com/"],
                          [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in
                           self.rule.patterns])
 
     @async_test()
     async def test_reject_request_with_pattern_and_response_matching_knowledge_base(self):
-        self.kb.page_not_found_response["http://example.com/"] = \
+        self.kb.soft_404_responses["http://example.com/"] = \
             [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in self.rule.patterns]
         self.rule.performed["http://example.com/"] = None
 
@@ -109,8 +109,17 @@ class DetectSoft404Test(TestCase):
                 await self.rule.after_response(self.create_entry(url))
 
     @async_test()
+    async def test_reject_request_if_pattern_not_listed_but_response_matching_any_soft_404_response(self):
+        self.kb.soft_404_responses["http://example.com/"] = [{"pattern": "/%s.html", "code": 200,
+                                                              "content": "response content"}]
+        self.rule.performed["http://example.com/"] = None
+
+        with self.assertRaises(RejectRequest):
+            await self.rule.after_response(self.create_entry("http://example.com/test.some-random-file-extension"))
+
+    @async_test()
     async def test_dont_reject_request_if_pattern_and_response_not_in_knowledge_base(self):
-        self.kb.page_not_found_response["http://example.com/"] = \
+        self.kb.soft_404_responses["http://example.com/"] = \
             [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in self.rule.patterns]
         self.rule.performed["http://example.com/"] = None
 
@@ -126,6 +135,16 @@ class DetectSoft404Test(TestCase):
     async def test_empty_response_count_as_soft_404(self):
         with self.assertRaises(RejectRequest):
             await self.rule.after_response(self.create_entry("http://example.com/test.html", response_content=""))
+
+    @async_test()
+    async def test_homepage_do_not_count_as_soft_404(self):
+        self.kb.soft_404_responses["http://example.com/"] = \
+            [{"pattern": pattern, "code": 200, "content": "home page"} for pattern in self.rule.patterns]
+        self.rule.performed["http://example.com/"] = None
+        try:
+            await self.rule.after_response(self.create_entry("http://example.com/", response_content="home page"))
+        except RejectRequest:
+            self.fail("Request rejected.")
 
     def create_entry(self, url, response_code=200, response_content="response content"):
         response = StaticResponse(response_code, {}, response_content)

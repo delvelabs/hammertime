@@ -59,36 +59,44 @@ class DetectSoft404:
         ]
 
         self.performed = {}
-        self.results = {}
+        self.soft_404_responses = {}
 
     def set_engine(self, engine):
         self.engine = engine
 
     def set_kb(self, kb):
-        kb.page_not_found_response = self.results
+        kb.soft_404_responses = self.soft_404_responses
 
     async def after_response(self, entry):
-        lock = urljoin(entry.request.url, "/")
+        server_address = urljoin(entry.request.url, "/")
 
-        if lock not in self.performed:
+        if server_address not in self.performed:
             # Temporarily assign a future to make sure work is not done twice
-            self.performed[lock] = asyncio.Future()
+            self.performed[server_address] = asyncio.Future()
 
             responses = await self._collect_samples(entry)
-            self.results[lock] = responses
-            self.performed[lock].set_result(True)
+            self.soft_404_responses[server_address] = responses
+            self.performed[server_address].set_result(True)
 
             # Remove the wait lock
-            self.performed[lock] = None
-        elif self.performed[lock] is not None:
-            await self.performed[lock]
+            self.performed[server_address] = None
+        elif self.performed[server_address] is not None:
+            await self.performed[server_address]
+
+        if entry.request.url == server_address:
+            return
 
         if len(entry.response.content) == 0:
             raise RejectRequest("Request is a soft 404.")
 
         url_pattern = self._get_pattern_from_url(entry.request.url)
-        for result in self.results[lock]:
-            if result["pattern"] == url_pattern:
+        if url_pattern is not None:
+            for result in self.soft_404_responses[server_address]:
+                if result["pattern"] == url_pattern:
+                    if result["code"] == entry.response.code and self._content_match(entry.response.content, result["content"]):
+                        raise RejectRequest("Request is a soft 404.")
+        else:
+            for result in self.soft_404_responses[server_address]:
                 if result["code"] == entry.response.code and self._content_match(entry.response.content, result["content"]):
                     raise RejectRequest("Request is a soft 404.")
 
