@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, call, ANY
 
 from fixtures import async_test
 
-from hammertime.rules import RejectStatusCode, DetectFalse404
+from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest
 from hammertime.engine import Engine
@@ -56,10 +56,10 @@ class RejectStatusCodeTest(TestCase):
             await r.after_headers(Entry.create("http://example.om/test", response=StaticResponse(503, {})))
 
 
-class DetectFalse404Test(TestCase):
+class DetectSoft404Test(TestCase):
 
     def setUp(self):
-        self.rule = DetectFalse404()
+        self.rule = DetectSoft404()
         self.rule.random_token = "not-so-random"
         self.engine = FakeEngine()
         self.rule.set_engine(self.engine)
@@ -99,12 +99,14 @@ class DetectFalse404Test(TestCase):
 
     @async_test()
     async def test_reject_request_with_pattern_and_response_matching_knowledge_base(self):
-        self.kb.page_not_found_response["http://example.com/"] = [{"pattern": "/%s.html", "code": 200,
-                                                                   "content": "response content"}]
+        self.kb.page_not_found_response["http://example.com/"] = \
+            [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in self.rule.patterns]
         self.rule.performed["http://example.com/"] = None
 
-        with self.assertRaises(RejectRequest):
-            await self.rule.after_response(self.create_entry("http://example.com/test.html"))
+        for pattern in self.rule.patterns:
+            url = "http://example.com%s" % (pattern % "test")
+            with self.assertRaises(RejectRequest):
+                await self.rule.after_response(self.create_entry(url))
 
     @async_test()
     async def test_dont_reject_request_if_pattern_and_response_not_in_knowledge_base(self):

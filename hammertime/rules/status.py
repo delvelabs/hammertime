@@ -37,7 +37,7 @@ class RejectStatusCode:
             raise RejectRequest("Status code reject: %s" % entry.response.code)
 
 
-class DetectFalse404:
+class DetectSoft404:
 
     def __init__(self):
         self.engine = None
@@ -84,13 +84,13 @@ class DetectFalse404:
             await self.performed[lock]
 
         if len(entry.response.content) == 0:
-            raise RejectRequest("Request is a false 404.")
+            raise RejectRequest("Request is a soft 404.")
 
         url_pattern = self._get_pattern_from_url(entry.request.url)
         for result in self.results[lock]:
             if result["pattern"] == url_pattern:
                 if result["code"] == entry.response.code and self._content_match(entry.response.content, result["content"]):
-                    raise RejectRequest("Request is a false 404.")
+                    raise RejectRequest("Request is a soft 404.")
 
     async def _collect_samples(self, entry):
         targets = [Entry.create(urljoin(entry.request.url, pattern % self.random_token), arguments={"pattern": pattern})
@@ -105,7 +105,14 @@ class DetectFalse404:
 
     def _get_pattern_from_url(self, url):
         path = url[len(urljoin(url, "/")):]
-        replace_path = path[:path.index(".")] if "." in path else path
+        if path.startswith("."):
+            return "/.%s"
+        elif path.endswith("/"):
+            return "/%s/"
+        elif "." not in path:
+            return "/%s"
+
+        replace_path = path[:path.rindex(".")]
         for pattern in self.patterns:
             if pattern % replace_path == "/%s" % path:
                 return pattern

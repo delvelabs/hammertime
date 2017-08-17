@@ -15,13 +15,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .status import RejectStatusCode, DetectFalse404
+from .status import RejectStatusCode, DetectSoft404
 from .body import IgnoreLargeBody
 from .timeout import DynamicTimeout
 
 
 __all__ = [
-    DetectFalse404,
+    DetectSoft404,
     RejectStatusCode,
     IgnoreLargeBody,
     DynamicTimeout
