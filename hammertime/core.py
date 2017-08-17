@@ -162,3 +162,7 @@ class Stats:
     @property
     def rate(self):
         return self.completed / self.duration
+
+    def __repr__(self):
+        return "Requested: {}, completed: {}, retries: {}, elapsed time: {}".format(self.requested, self.completed,
+                                                                                    self.retries, self.duration)

@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, ANY
 
 from fixtures import async_test
 
@@ -24,6 +24,7 @@ from hammertime.rules import RejectStatusCode, DetectFalse404
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest
 from hammertime.engine import Engine
+from hammertime.kb import KnowledgeBase
 
 
 class RejectStatusCodeTest(TestCase):
@@ -62,25 +63,71 @@ class DetectFalse404Test(TestCase):
         self.rule.random_token = "not-so-random"
         self.engine = FakeEngine()
         self.rule.set_engine(self.engine)
+        self.kb = KnowledgeBase()
+        self.rule.set_kb(self.kb)
 
     @async_test()
     async def test_calls_made_to_alternate_urls(self):
-        await self.rule.after_response(Entry.create("http://example.com/test", response=StaticResponse(400, {})))
+        await self.rule.after_response(self.create_entry("http://example.com/test", response_code=400))
 
         self.engine.mock.perform_high_priority.assert_has_calls([
-            call(Entry.create("http://example.com/not-so-random.aspx"), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random.html"), self.rule.child_heuristics),
+            call(Entry.create("http://example.com/not-so-random.aspx", arguments=ANY), self.rule.child_heuristics),
+            call(Entry.create("http://example.com/not-so-random.html", arguments=ANY), self.rule.child_heuristics),
         ], any_order=True)
 
     @async_test()
     async def test_calls_not_made_second_time_around(self):
-        await self.rule.after_response(Entry.create("http://example.com/test", response=StaticResponse(400, {})))
+        await self.rule.after_response(self.create_entry("http://example.com/test", response_code=400))
 
         self.engine.mock.reset_mock()
 
-        await self.rule.after_response(Entry.create("http://example.com/test-more-example", response=StaticResponse(400, {})))
+        await self.rule.after_response(self.create_entry("http://example.com/test", response_code=400))
 
         self.engine.mock.perform_high_priority.assert_not_called()
+
+    @async_test()
+    async def test_add_alternate_url_response_to_knowledge_base(self):
+        response = StaticResponse(200, {})
+        response.content = "response content"
+        self.engine.mock.perform_high_priority = lambda entry, heuristics: entry._replace(response=response)
+
+        await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
+
+        self.assertEqual(self.kb.page_not_found_response["http://example.com/"],
+                         [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in
+                          self.rule.patterns])
+
+    @async_test()
+    async def test_reject_request_with_pattern_and_response_matching_knowledge_base(self):
+        self.kb.page_not_found_response["http://example.com/"] = [{"pattern": "/%s.html", "code": 200,
+                                                                   "content": "response content"}]
+        self.rule.performed["http://example.com/"] = None
+
+        with self.assertRaises(RejectRequest):
+            await self.rule.after_response(self.create_entry("http://example.com/test.html"))
+
+    @async_test()
+    async def test_dont_reject_request_if_pattern_and_response_not_in_knowledge_base(self):
+        self.kb.page_not_found_response["http://example.com/"] = \
+            [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in self.rule.patterns]
+        self.rule.performed["http://example.com/"] = None
+
+        try:
+            await self.rule.after_response(self.create_entry("http://example.com/test.html", response_content="test"))
+            await self.rule.after_response(self.create_entry("http://example.com/test", response_content="test"))
+            await self.rule.after_response(self.create_entry("http://example.com/.test", response_content="test"))
+            await self.rule.after_response(self.create_entry("http://example.com/test.php", response_content="test"))
+        except RejectRequest:
+            self.fail("Request rejected.")
+
+    @async_test()
+    async def test_empty_response_count_as_soft_404(self):
+        with self.assertRaises(RejectRequest):
+            await self.rule.after_response(self.create_entry("http://example.com/test.html", response_content=""))
+
+    def create_entry(self, url, response_code=200, response_content="response content"):
+        response = StaticResponse(response_code, {}, response_content)
+        return Entry.create(url, response=response)
 
 
 class FakeEngine(Engine):

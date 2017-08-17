@@ -22,6 +22,7 @@ from urllib.parse import urljoin
 
 from ..ruleset import RejectRequest, Heuristics
 from ..http import Entry
+from difflib import SequenceMatcher
 
 
 class RejectStatusCode:
@@ -52,13 +53,19 @@ class DetectFalse404:
             "/%s.pl",
             "/%s.cgi",
             "/%s.cfm",
+            "/%s.txt",
+            "/%s.js",
             "/.%s",
         ]
 
         self.performed = {}
+        self.results = {}
 
     def set_engine(self, engine):
         self.engine = engine
+
+    def set_kb(self, kb):
+        kb.page_not_found_response = self.results
 
     async def after_response(self, entry):
         lock = urljoin(entry.request.url, "/")
@@ -67,7 +74,8 @@ class DetectFalse404:
             # Temporarily assign a future to make sure work is not done twice
             self.performed[lock] = asyncio.Future()
 
-            await self._collect_samples(entry)
+            responses = await self._collect_samples(entry)
+            self.results[lock] = responses
             self.performed[lock].set_result(True)
 
             # Remove the wait lock
@@ -75,8 +83,34 @@ class DetectFalse404:
         elif self.performed[lock] is not None:
             await self.performed[lock]
 
-    async def _collect_samples(self, entry):
-        targets = {urljoin(entry.request.url, pattern % self.random_token) for pattern in self.patterns}
+        if len(entry.response.content) == 0:
+            raise RejectRequest("Request is a false 404.")
 
-        jobs = [self.engine.perform_high_priority(Entry.create(target), self.child_heuristics) for target in targets]
+        url_pattern = self._get_pattern_from_url(entry.request.url)
+        for result in self.results[lock]:
+            if result["pattern"] == url_pattern:
+                if result["code"] == entry.response.code and self._content_match(entry.response.content, result["content"]):
+                    raise RejectRequest("Request is a false 404.")
+
+    async def _collect_samples(self, entry):
+        targets = [Entry.create(urljoin(entry.request.url, pattern % self.random_token), arguments={"pattern": pattern})
+                   for pattern in self.patterns]
+        jobs = [self.engine.perform_high_priority(entry, self.child_heuristics) for entry in targets]
         results = await asyncio.gather(*jobs)
+        responses = []
+        for entry in results:
+            responses.append({"pattern": entry.arguments["pattern"], "code": entry.response.code,
+                              "content": entry.response.content})
+        return responses
+
+    def _get_pattern_from_url(self, url):
+        path = url[len(urljoin(url, "/")):]
+        replace_path = path[:path.index(".")] if "." in path else path
+        for pattern in self.patterns:
+            if pattern % replace_path == "/%s" % path:
+                return pattern
+        return None
+
+    def _content_match(self, response_content, soft_404_content):
+        matcher = SequenceMatcher(a=response_content, b=soft_404_content, autojunk=False)
+        return matcher.ratio() > 0.8
