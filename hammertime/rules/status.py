@@ -18,11 +18,17 @@
 
 import asyncio
 import uuid
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from ..ruleset import RejectRequest, Heuristics
 from ..http import Entry
 from difflib import SequenceMatcher
+import simhash
+import os
+from collections import defaultdict
+import re
+import random
+import string
 
 
 class RejectStatusCode:
@@ -58,8 +64,8 @@ class DetectSoft404:
             "/.%s",
         ]
 
-        self.performed = {}
-        self.soft_404_responses = {}
+        self.performed = defaultdict(dict)
+        self.soft_404_responses = defaultdict(list)
 
     def set_engine(self, engine):
         self.engine = engine
@@ -69,8 +75,20 @@ class DetectSoft404:
 
     async def after_response(self, entry):
         server_address = urljoin(entry.request.url, "/")
+        request_url_pattern = self._extract_pattern_from_url(entry.request.url)
 
-        if server_address not in self.performed:
+        if server_address not in self.performed or request_url_pattern not in self.performed[server_address]:
+            #if server_address not in self.soft_404_responses or request_url_pattern not in [response["pattern"] for response in self.soft_404_responses[server_address]]:
+            # Temporarily assign a future to make sure work is not done twice
+            self.performed[server_address][request_url_pattern] = asyncio.Future()
+            response = await self._collect_sample(entry, request_url_pattern)
+            self.soft_404_responses[server_address].append(response)
+            self.performed[server_address][request_url_pattern].set_result(True)
+            # Remove the wait lock
+            self.performed[server_address][request_url_pattern] = None
+        elif self.performed[server_address][request_url_pattern] is not None:
+            await self.performed[server_address][request_url_pattern]
+        if False: #server_address not in self.performed:
             # Temporarily assign a future to make sure work is not done twice
             self.performed[server_address] = asyncio.Future()
 
@@ -80,7 +98,7 @@ class DetectSoft404:
 
             # Remove the wait lock
             self.performed[server_address] = None
-        elif self.performed[server_address] is not None:
+        elif False: # self.performed[server_address] is not None:
             await self.performed[server_address]
 
         if entry.request.url == server_address:
@@ -89,7 +107,7 @@ class DetectSoft404:
         if len(entry.response.content) == 0:
             raise RejectRequest("Request is a soft 404.")
 
-        url_pattern = self._get_pattern_from_url(entry.request.url)
+        url_pattern = self._extract_pattern_from_url(entry.request.url)
         if url_pattern is not None:
             for result in self.soft_404_responses[server_address]:
                 if result["pattern"] == url_pattern:
@@ -98,6 +116,7 @@ class DetectSoft404:
         else:
             for result in self.soft_404_responses[server_address]:
                 if result["code"] == entry.response.code and self._content_match(entry.response.content, result["content"]):
+                    print("error for %s" % url_pattern)
                     raise RejectRequest("Request is a soft 404.")
 
     async def _collect_samples(self, entry):
@@ -110,6 +129,11 @@ class DetectSoft404:
             responses.append({"pattern": entry.arguments["pattern"], "code": entry.response.code,
                               "content": entry.response.content})
         return responses
+
+    async def _collect_sample(self, entry, request_url_pattern):
+        request = Entry.create(urljoin(entry.request.url, request_url_pattern % self.random_token))
+        result = await self.engine.perform_high_priority(request, self.child_heuristics)
+        return {"pattern": request_url_pattern, "code": result.response.code, "content": result.response.content}
 
     def _get_pattern_from_url(self, url):
         path = url[len(urljoin(url, "/")):]
@@ -127,5 +151,65 @@ class DetectSoft404:
         return None
 
     def _content_match(self, response_content, soft_404_content):
+        #return simhash.num_differing_bits(self.compute(response_content), self.compute(soft_404_content)) < 3
         matcher = SequenceMatcher(a=response_content, b=soft_404_content, autojunk=False)
         return matcher.ratio() > 0.8
+
+    def compute(self, text):
+        tokens = []
+        chunk_size = 20
+        for i in range(0, len(text), chunk_size):
+            tokens.append(text[i:i + chunk_size])
+        shingles = [''.join(shingle) for shingle in simhash.shingle(tokens, 4)]
+        hashes = [simhash.unsigned_hash(s.encode('utf8')) for s in shingles]
+        return simhash.compute(hashes)
+
+    def _extract_pattern_from_url(self, url):
+        path = urlparse(url).path
+        if self._is_directory(path):
+            return self._extract_subpattern_from_path(path, "/%s/")
+        file_path, file_name = os.path.split(path)
+        file_name, file_extension = os.path.splitext(file_name)
+        if len(file_extension) > 0:
+            pattern = "/%s" + file_extension
+        elif file_name.startswith("."):
+            pattern = "/.%s"
+        else:
+            pattern = "/%s"
+        return self._extract_subpattern_from_path("/" + file_name + file_extension, pattern)
+
+    def _extract_subpattern_from_path(self, path, pattern):
+        path_pattern = re.sub("%s", "(?P<path>.+)", pattern)
+        inner_path = re.match(path_pattern, path).group("path")
+        parts = re.split("\W", inner_path)
+        sub_pattern = re.sub("\w+", "{}", inner_path)
+        sub_pattern_list = []
+        for part in parts:
+            if len(part) > 0:
+                if re.fullmatch("[a-z]+", part):
+                    sub_pattern_list.append("\l")
+                elif re.fullmatch("[A-Z]+", part):
+                    sub_pattern_list.append("\L")
+                elif re.fullmatch("[a-zA-Z]+", part):
+                    sub_pattern_list.append("\i")
+                elif re.fullmatch("\d+", part):
+                    sub_pattern_list.append("\d")
+                else:
+                    sub_pattern_list.append("\w")
+            else:
+                sub_pattern_list.append("")
+        sub_pattern = sub_pattern.format(*sub_pattern_list)
+        return pattern % sub_pattern
+
+    def _create_random_url_for_url(self, url):
+        url_pattern = self._extract_pattern_from_url(urlparse(url).path)
+        path = url_pattern.replace("\d", "".join([random.choice(string.digits) for i in range(random.randint(4, 8))]))
+        path = path.replace("\l", "".join([random.choice(string.ascii_lowercase) for i in range(random.randint(4, 8))]))
+        path = path.replace("\L", "".join([random.choice(string.ascii_uppercase) for i in range(random.randint(4, 8))]))
+        path = path.replace("\i", "".join([random.choice(string.ascii_letters) for i in range(random.randint(4, 8))]))
+        path = path.replace("\w", "".join([random.choice(string.ascii_letters + string.digits + "_") for i in range(random.randint(2, 10))]))
+        print("{} -> {}".format(urlparse(url).path, path))
+        return urljoin(url, path)
+
+    def _is_directory(self, path):
+        return len(os.path.split(path)[1]) == 0

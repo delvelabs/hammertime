@@ -164,5 +164,5 @@ class Stats:
         return self.completed / self.duration
 
     def __repr__(self):
-        return "Requested: {}, completed: {}, retries: {}, elapsed time: {}".format(self.requested, self.completed,
-                                                                                    self.retries, self.duration)
+        return "Requested: {}, completed: {}, retries: {}, elapsed time: {}, request rate: {}".format(self.requested, self.completed,
+                                                                                    self.retries, self.duration, self.completed / self.duration)
