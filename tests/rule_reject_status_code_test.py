@@ -215,8 +215,8 @@ class DetectSoft404Test(TestCase):
             random_urls.append(self.rule._create_random_url_for_url(urljoin(base_url, path)))
 
         expected = ["/[a-z]+", "/[a-z]+-\d+", "/\d+-[A-Z]+", "/\w+", "/[a-zA-Z]+.html", "/[a-z]+-\d+.html",
-                    "/\w+.html", "/.[a-z]+", "/.[a-z]+-\d+", "/.\d+-[a-zA⁻Z]+", "/.\w+", "/.\w+", "/[a-zA-Z]+/",
-                    "/[a-zA-Z]+-\d+/", "/\d+-[a-zA-Z]+/", "/\d+.json", "/[a-zA-Z]+.json"]
+                    "/\w+.html", "/\w+\.\w+.html", "/.[a-z]+", "/.[a-z]+-\d+", "/.\d+-[a-zA⁻Z]+", "/.\w+", "/.\w+",
+                    "/[a-zA-Z]+/", "/[a-zA-Z]+-\d+/", "/\d+-[a-zA-Z]+/", "/\d+.json", "/[a-zA-Z]+.json"]
         for result, regex in zip(random_urls, expected):
             self.assertTrue(result.startswith(base_url))
             try:
