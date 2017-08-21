@@ -166,40 +166,43 @@ class DetectSoft404:
 
     def _extract_pattern_from_url(self, url):
         path = urlparse(url).path
-        if self._is_directory(path):
-            return self._extract_subpattern_from_path(path, "/%s/")
-        file_path, file_name = os.path.split(path)
-        file_name, file_extension = os.path.splitext(file_name)
-        if len(file_extension) > 0:
-            pattern = "/%s" + file_extension
-        elif file_name.startswith("."):
-            pattern = "/.%s"
-        else:
-            pattern = "/%s"
-        return self._extract_subpattern_from_path("/" + file_name + file_extension, pattern)
+        directory_pattern = self._extract_directory_pattern(path)
+        filename_pattern = self._extract_filename_pattern_from_url_path(path)
+        return directory_pattern + filename_pattern
 
-    def _extract_subpattern_from_path(self, path, pattern):
-        path_pattern = re.sub("%s", "(?P<path>.+)", pattern)
-        inner_path = re.match(path_pattern, path).group("path")
-        parts = re.split("\W", inner_path)
-        sub_pattern = re.sub("\w+", "{}", inner_path)
-        sub_pattern_list = []
+    def _extract_directory_pattern(self, url_path):
+        directory_path, filename = os.path.split(url_path)
+        if directory_path == "/":
+            return "/"
+        directories = re.split("/", directory_path[1:])  # Skip the leading "/"
+        directory_pattern = self._create_pattern_from_string(directories[0])  # only use the pattern of the first directory.
+        return "/%s/" % directory_pattern
+
+    def _extract_filename_pattern_from_url_path(self, path):
+        directory_path, filename = os.path.split(path)
+        if len(filename) > 0:
+            filename, extension = os.path.splitext(filename)
+            return self._create_pattern_from_string(filename) + extension
+        else:
+            return ""
+
+    def _create_pattern_from_string(self, string):
+        parts = re.split("\W", string)
+        pattern = re.sub("\w+", "{}", string)
+        pattern_list = []
         for part in parts:
             if len(part) > 0:
                 if re.fullmatch("[a-z]+", part):
-                    sub_pattern_list.append("\l")
+                    pattern_list.append("\l")
                 elif re.fullmatch("[A-Z]+", part):
-                    sub_pattern_list.append("\L")
+                    pattern_list.append("\L")
                 elif re.fullmatch("[a-zA-Z]+", part):
-                    sub_pattern_list.append("\i")
+                    pattern_list.append("\i")
                 elif re.fullmatch("\d+", part):
-                    sub_pattern_list.append("\d")
+                    pattern_list.append("\d")
                 else:
-                    sub_pattern_list.append("\w")
-            else:
-                sub_pattern_list.append("")
-        sub_pattern = sub_pattern.format(*sub_pattern_list)
-        return pattern % sub_pattern
+                    pattern_list.append("\w")
+        return pattern.format(*pattern_list)
 
     def _create_random_url_for_url(self, url):
         url_pattern = self._extract_pattern_from_url(urlparse(url).path)

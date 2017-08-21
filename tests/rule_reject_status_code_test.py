@@ -28,6 +28,7 @@ from hammertime.engine import Engine
 from hammertime.kb import KnowledgeBase
 import re
 import uuid
+import random
 
 
 class RejectStatusCodeTest(TestCase):
@@ -182,15 +183,17 @@ class DetectSoft404Test(TestCase):
             self.fail("Request rejected.")
 
     def test_extract_pattern_from_url(self):
-        self.skipTest("")
         paths = ["/test", "/test/", "/test.html", "/test.png", "/test.json",
-                 "/test/test2/test.min.js", "/test/.test", "/.test"]
-        patterns = ["/%s", "/%s/", "/%s.html", "/%s.png", "/%s.json", "/%s.js", "/.%s"]
+                 "/test/test2/test.123.js", "/test/.test", "/.test", "/", "/.test/123.php", "/TEST/.123.html"]
+
+        patterns = ["/\l", "/\l/", "/\l.html", "/\l.png", "/\l.json", "/\l/\l.\d.js", "/\l/.\l", "/.\l", "/",
+                    "/.\l/\d.php", "/\L/.\d.html"]
         url = "http://www.example.com/"
         for path, pattern in zip(paths, patterns):
             self.assertEqual(self.rule._extract_pattern_from_url(urljoin(url, path)), pattern)
 
     def test_extract_sub_patterns_from_url(self):
+        self.skipTest("")
         paths = ["/test", "/test-123", "/123-test", "/te12st34", "/TEST.html", "/test-123.html", "/123_test.html",
                  "/te12.st34.html", "/.Test", "/.teSt-123", "/.123-test", "/.123_test", "/.te12st34", "/tESt/",
                  "123/test.js"]
@@ -202,6 +205,15 @@ class DetectSoft404Test(TestCase):
             pattern = self.rule._extract_pattern_from_url(complete_url)
             print(pattern)
             self.assertEqual(self.rule._extract_pattern_from_url(complete_url), sub_pattern)
+
+    def test_extract_filename_pattern_from_url_path(self):
+        paths = ["/test", "/test-123", "/123-test", "/te12st34", "/TEST.html", "/test-123.html", "/123_test.html",
+                 "/te12.st34.html", "/.Test", "/.teSt-123", "/.123-test", "/.123_test", "/.te12st34", "/tESt/",
+                 "/123/test.js", "/test.php"]
+        patterns = ["\l", "\l-\d", "\d-\l", "\w", "\L.html", "\l-\d.html", "\w.html", "\w.\w.html", ".\i",
+                    ".\i-\d", ".\d-\l", ".\w", ".\w", "", "\l.js", "\l.php"]
+        for path, pattern in zip(paths, patterns):
+            self.assertEqual(self.rule._extract_filename_pattern_from_url_path(path), pattern)
 
     def test_create_random_url_matching_url_pattern_of_request(self):
         self.rule.random_token = str(uuid.uuid4())
@@ -216,7 +228,7 @@ class DetectSoft404Test(TestCase):
 
         expected = ["/[a-z]+", "/[a-z]+-\d+", "/\d+-[A-Z]+", "/\w+", "/[a-zA-Z]+.html", "/[a-z]+-\d+.html",
                     "/\w+.html", "/\w+\.\w+.html", "/.[a-z]+", "/.[a-z]+-\d+", "/.\d+-[a-zA⁻Z]+", "/.\w+", "/.\w+",
-                    "/[a-zA-Z]+/", "/[a-zA-Z]+-\d+/", "/\d+-[a-zA-Z]+/", "/\d+.json", "/[a-zA-Z]+.json"]
+                    "/[a-zA-Z]+/", "/[a-zA-Z]+-\d+/", "/\d+-[a-zA-Z]+/", "/[a-z]+/\d+.json", "/\d+/[a-zA-Z]+.json"]
         for result, regex in zip(random_urls, expected):
             self.assertTrue(result.startswith(base_url))
             try:
@@ -225,6 +237,28 @@ class DetectSoft404Test(TestCase):
                 print(result)
                 print(regex)
                 raise e
+
+    def test_extract_directory_pattern_from_url_path(self):
+        paths = ["/test/", "/123/", "/TEST/", "/teST/", "/test123/", "/.test/", "/.123/", "/123-test/", "/.TEST-123/",
+                 "/", "/test.html"]
+        filenames = ["test.json", "test.html", "test.js", "", "test", ".test", "test.123.php"]
+        url_path = [path + random.choice(filenames) for path in paths]
+
+        directory_patterns = [self.rule._extract_directory_pattern(path) for path in url_path]
+
+        expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/\w/", "/.\l/", "/.\d/", "/\d-\l/", "/.\L-\d/", "/", "/"]
+        self.assertEqual(directory_patterns, expected)
+
+    def test_extract_directory_pattern_from_url_path_return_pattern_of_first_directory(self):
+        paths = ["/test/123/", "/123/test/", "/TEST/test/", "/teST/123/", "/.test/123/", "/.123/test/", "/123-test/12/",
+                 "/123/test-123/"]
+        filenames = ["test.json", "test.html", "test.js", "", "test", ".test", "test.123.php"]
+        url_path = [path + random.choice(filenames) for path in paths]
+
+        directory_patterns = [self.rule._extract_directory_pattern(path) for path in url_path]
+
+        expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/.\l/", "/.\d/", "/\d-\l/", "/\d/"]
+        self.assertEqual(directory_patterns, expected)
 
     def create_entry(self, url, response_code=200, response_content="response content"):
         response = StaticResponse(response_code, {}, response_content)
