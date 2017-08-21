@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock, call, ANY
+from unittest.mock import MagicMock, call, patch
 from urllib.parse import urljoin, urlparse
 
 from fixtures import async_test
@@ -69,45 +69,48 @@ class DetectSoft404Test(TestCase):
         self.rule.set_engine(self.engine)
         self.kb = KnowledgeBase()
         self.rule.set_kb(self.kb)
+        self.patterns = ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]
 
     @async_test()
-    async def test_calls_made_to_alternate_urls(self):
-        self.skipTest("")
-        await self.rule.after_response(self.create_entry("http://example.com/test", response_code=400))
+    async def test_calls_made_to_random_url_matching_target_url_pattern(self):
+        self.rule._create_random_url_for_url = MagicMock(return_value="http://example.com/random.html")
+
+        await self.rule.after_response(self.create_entry("http://example.com/test.html", response_code=400))
 
         self.engine.mock.perform_high_priority.assert_has_calls([
-            call(Entry.create("http://example.com/not-so-random.aspx", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random.html", arguments=ANY), self.rule.child_heuristics),
-        ], any_order=True)
+            call(Entry.create("http://example.com/random.html"), self.rule.child_heuristics)],
+            any_order=True)
 
     @async_test()
     async def test_call_made_to_alternate_url_for_request_url_pattern(self):
-        self.skipTest("")
         response = StaticResponse(200, {}, content="content")
         self.engine.mock.perform_high_priority.side_effect = lambda entry, heuristics: entry._replace(response=response)
-        await self.rule.after_response(self.create_entry("http://example.com/test"))
-        await self.rule.after_response(self.create_entry("http://example.com/test/"))
-        await self.rule.after_response(self.create_entry("http://example.com/.test"))
-        await self.rule.after_response(self.create_entry("http://example.com/test/test.html"))
-        await self.rule.after_response(self.create_entry("http://example.com/test/test.min.js"))
-        await self.rule.after_response(self.create_entry("http://example.com/test/test.json"))
-        await self.rule.after_response(self.create_entry("http://example.com/test/test.png"))
-        await self.rule.after_response(self.create_entry("http://example.com/test/test.gif"))
+        module_path = "hammertime.rules.status.string"
+        with patch(module_path + ".ascii_uppercase", "A"), patch(module_path + ".ascii_lowercase", "a"), \
+             patch(module_path + ".digits", "1"), patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
 
-        self.engine.mock.perform_high_priority.assert_has_calls([
-            call(Entry.create("http://example.com/not-so-random", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random/", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/.not-so-random", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random.html", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random.js", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random.json", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random.png", arguments=ANY), self.rule.child_heuristics),
-            call(Entry.create("http://example.com/not-so-random.gif", arguments=ANY), self.rule.child_heuristics),
-        ])
+            await self.rule.after_response(self.create_entry("http://example.com/test"))
+            await self.rule.after_response(self.create_entry("http://example.com/test/"))
+            await self.rule.after_response(self.create_entry("http://example.com/.test"))
+            await self.rule.after_response(self.create_entry("http://example.com/123/test.html"))
+            await self.rule.after_response(self.create_entry("http://example.com/TEST/123.min.js"))
+            await self.rule.after_response(self.create_entry("http://example.com/test/TEST.json"))
+            await self.rule.after_response(self.create_entry("http://example.com/123/test.png"))
+            await self.rule.after_response(self.create_entry("http://example.com/TEST/test.gif"))
+
+            self.engine.mock.perform_high_priority.assert_has_calls([
+                call(Entry.create("http://example.com/a"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/a/"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/.a"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/1/a.html"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/A/1.a.js"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/a/A.json"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/1/a.png"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/A/a.gif"), self.rule.child_heuristics),
+            ])
 
     @async_test()
     async def test_calls_not_made_second_time_around(self):
-        self.skipTest("")
         await self.rule.after_response(self.create_entry("http://example.com/test", response_code=400))
 
         self.engine.mock.reset_mock()
@@ -118,44 +121,40 @@ class DetectSoft404Test(TestCase):
 
     @async_test()
     async def test_add_alternate_url_response_to_knowledge_base(self):
-        self.skipTest("")
         response = StaticResponse(200, {})
         response.content = "response content"
         self.engine.mock.perform_high_priority = lambda entry, heuristics: entry._replace(response=response)
 
         await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
+        await self.rule.after_response(self.create_entry("http://example.com/123/", response_content="response"))
+        await self.rule.after_response(self.create_entry("http://example.com/.test", response_content="response"))
+        await self.rule.after_response(self.create_entry("http://example.com/123/test.js", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"],
-                         [{"pattern": "/%s", "code": 200, "content": "response content"}])
+                         [{"pattern": "/\l", "code": 200, "content": "response content"},
+                          {"pattern": "/\d/", "code": 200, "content": "response content"},
+                          {"pattern": "/.\l", "code": 200, "content": "response content"},
+                          {"pattern": "/\d/\l.js", "code": 200, "content": "response content"}])
 
     @async_test()
     async def test_reject_request_with_pattern_and_response_matching_knowledge_base(self):
-        self.skipTest("")
-        self.kb.soft_404_responses["http://example.com/"] = \
-            [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in self.rule.patterns]
-        self.rule.performed["http://example.com/"] = None
+        for pattern in self.patterns:
+            self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
+                                                                      "content": "response content"})
+            self.rule.performed["http://example.com/"] = {pattern: None}
 
-        for pattern in self.rule.patterns:
-            url = "http://example.com%s" % (pattern % "test")
+        urls = [urljoin("http://example.com/", path) for path in ["/test/123.html", "/123-test.js", "/TEST/", "/TesT",
+                                                                  "/.test.js"]]
+        for url in urls:
             with self.assertRaises(RejectRequest):
                 await self.rule.after_response(self.create_entry(url))
 
     @async_test()
-    async def test_reject_request_if_pattern_not_listed_but_response_matching_any_soft_404_response(self):
-        self.skipTest("")
-        self.kb.soft_404_responses["http://example.com/"] = [{"pattern": "/%s.html", "code": 200,
-                                                              "content": "response content"}]
-        self.rule.performed["http://example.com/"] = None
-
-        with self.assertRaises(RejectRequest):
-            await self.rule.after_response(self.create_entry("http://example.com/test.some-random-file-extension"))
-
-    @async_test()
     async def test_dont_reject_request_if_pattern_and_response_not_in_knowledge_base(self):
-        self.skipTest("")
-        self.kb.soft_404_responses["http://example.com/"] = \
-            [{"pattern": pattern, "code": 200, "content": "response content"} for pattern in self.rule.patterns]
-        self.rule.performed["http://example.com/"] = None
+        for pattern in self.patterns:
+            self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
+                                                                      "content": "response content"})
+            self.rule.performed["http://example.com/"] = {pattern: None}
 
         try:
             await self.rule.after_response(self.create_entry("http://example.com/test.html", response_content="test"))
@@ -166,17 +165,11 @@ class DetectSoft404Test(TestCase):
             self.fail("Request rejected.")
 
     @async_test()
-    async def test_empty_response_count_as_soft_404(self):
-        self.skipTest("")
-        with self.assertRaises(RejectRequest):
-            await self.rule.after_response(self.create_entry("http://example.com/test.html", response_content=""))
-
-    @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
-        self.skipTest("")
-        self.kb.soft_404_responses["http://example.com/"] = \
-            [{"pattern": pattern, "code": 200, "content": "home page"} for pattern in self.rule.patterns]
-        self.rule.performed["http://example.com/"] = None
+        for pattern in self.patterns:
+            self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
+                                                                      "content": "home page"})
+            self.rule.performed["http://example.com/"] = {pattern: None}
         try:
             await self.rule.after_response(self.create_entry("http://example.com/", response_content="home page"))
         except RejectRequest:
@@ -191,20 +184,6 @@ class DetectSoft404Test(TestCase):
         url = "http://www.example.com/"
         for path, pattern in zip(paths, patterns):
             self.assertEqual(self.rule._extract_pattern_from_url(urljoin(url, path)), pattern)
-
-    def test_extract_sub_patterns_from_url(self):
-        self.skipTest("")
-        paths = ["/test", "/test-123", "/123-test", "/te12st34", "/TEST.html", "/test-123.html", "/123_test.html",
-                 "/te12.st34.html", "/.Test", "/.teSt-123", "/.123-test", "/.123_test", "/.te12st34", "/tESt/",
-                 "123/test.js"]
-        sub_patterns = ["/\l", "/\l-\d", "/\d-\l", "/\w", "/\L.html", "/\l-\d.html", "/\w.html", "/\w.\w.html", "/.\i",
-                        "/.\i-\d", "/.\d-\l", "/.\w", "/.\w", "/\i/", "/\l.js"]
-        url = "http://www.example.com/"
-        for path, sub_pattern in zip(paths, sub_patterns):
-            complete_url = urljoin(url, path)
-            pattern = self.rule._extract_pattern_from_url(complete_url)
-            print(pattern)
-            self.assertEqual(self.rule._extract_pattern_from_url(complete_url), sub_pattern)
 
     def test_extract_filename_pattern_from_url_path(self):
         paths = ["/test", "/test-123", "/123-test", "/te12st34", "/TEST.html", "/test-123.html", "/123_test.html",
@@ -224,7 +203,8 @@ class DetectSoft404Test(TestCase):
 
         random_urls = []
         for path in paths:
-            random_urls.append(self.rule._create_random_url_for_url(urljoin(base_url, path)))
+            url = urljoin(base_url, path)
+            random_urls.append(self.rule._create_random_url_for_url(url, self.rule._extract_pattern_from_url(url)))
 
         expected = ["/[a-z]+", "/[a-z]+-\d+", "/\d+-[A-Z]+", "/\w+", "/[a-zA-Z]+.html", "/[a-z]+-\d+.html",
                     "/\w+.html", "/\w+\.\w+.html", "/.[a-z]+", "/.[a-z]+-\d+", "/.\d+-[a-zA⁻Z]+", "/.\w+", "/.\w+",
