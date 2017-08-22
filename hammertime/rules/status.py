@@ -22,8 +22,7 @@ from urllib.parse import urljoin, urlparse
 
 from ..ruleset import RejectRequest, Heuristics
 from ..http import Entry
-from difflib import SequenceMatcher
-import simhash
+from .simhash import Simhash
 import os
 from collections import defaultdict
 import re
@@ -91,18 +90,9 @@ class DetectSoft404:
         return {"pattern": url_pattern, "code": result.response.code, "content": result.response.content}
 
     def _content_match(self, response_content, soft_404_content):
-        #return simhash.num_differing_bits(self.compute(response_content), self.compute(soft_404_content)) < 3
-        matcher = SequenceMatcher(a=response_content, b=soft_404_content, autojunk=False)
-        return matcher.ratio() > 0.8
-
-    def compute(self, text):
-        tokens = []
-        chunk_size = 20
-        for i in range(0, len(text), chunk_size):
-            tokens.append(text[i:i + chunk_size])
-        shingles = [''.join(shingle) for shingle in simhash.shingle(tokens, 4)]
-        hashes = [simhash.unsigned_hash(s.encode('utf8')) for s in shingles]
-        return simhash.compute(hashes)
+        if response_content == soft_404_content:
+            return True
+        return Simhash(response_content).distance(Simhash(soft_404_content)) < 5
 
     def _extract_pattern_from_url(self, url):
         path = urlparse(url).path
@@ -144,13 +134,25 @@ class DetectSoft404:
                     pattern_list.append("\w")
         return pattern.format(*pattern_list)
 
-    def _create_random_url_for_url(self, url, url_pattern):
-        path = url_pattern.replace("\d", "".join([random.choice(string.digits) for i in range(random.randint(4, 8))]))
-        path = path.replace("\l", "".join([random.choice(string.ascii_lowercase) for i in range(random.randint(4, 8))]))
-        path = path.replace("\L", "".join([random.choice(string.ascii_uppercase) for i in range(random.randint(4, 8))]))
-        path = path.replace("\i", "".join([random.choice(string.ascii_letters) for i in range(random.randint(4, 8))]))
-        path = path.replace("\w", "".join([random.choice(string.ascii_letters + string.digits + "_") for i in range(random.randint(2, 10))]))
+    def _create_random_url_for_url(self, url, path):
+        replace_patterns = ["\l", "\L", "\i", "\d", "\w"]
+        for pattern in replace_patterns:
+            path = path.replace(pattern, self._create_random_pattern(pattern, random.randint(4, 8)))
         return urljoin(url, path)
 
-    def _is_directory(self, path):
-        return len(os.path.split(path)[1]) == 0
+    def _create_random_pattern(self, pattern, length):
+        choices = None
+        if pattern == "\l":
+            choices = string.ascii_lowercase
+        elif pattern == "\L":
+            choices = string.ascii_uppercase
+        elif pattern == "\i":
+            choices = string.ascii_letters
+        elif pattern == "\w":
+            choices = string.ascii_letters + string.digits + "_"
+        elif pattern == "\d":
+            choices = string.digits
+        if choices is not None:
+            return "".join([random.choice(choices) for _ in range(length)])
+        else:
+            return ""

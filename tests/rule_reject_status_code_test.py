@@ -29,6 +29,9 @@ from hammertime.kb import KnowledgeBase
 import re
 import uuid
 import random
+import simhash
+from hammertime.rules.simhash import Simhash
+import string
 
 
 class RejectStatusCodeTest(TestCase):
@@ -239,6 +242,29 @@ class DetectSoft404Test(TestCase):
 
         expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/.\l/", "/.\d/", "/\d-\l/", "/\d/"]
         self.assertEqual(directory_patterns, expected)
+
+    def test_result_equals(self):
+        strings = []
+        for j in range(1000):
+            length = random.randint(10, 100)
+            strings.append("".join(random.choice(string.ascii_letters + string.digits + "#!_ .,<>") for i in range(length)))
+        for _string in strings:
+            hash0 = self.compute(_string)
+            hash1 = Simhash(_string).value
+            self.assertEqual(hash0, hash1)
+        for i in range(len(strings) - 1):
+            hash0 = self.compute(strings[i])
+            hash1 = self.compute(strings[i + 1])
+            _hash0 = Simhash(strings[i])
+            _hash1 = Simhash(strings[i + 1])
+            self.assertEqual(simhash.num_differing_bits(hash0, hash1), _hash0.distance(_hash1))
+
+    def compute(self, data):
+        window_size = 4
+        content = data.lower()
+        shingles = [''.join(_shingle) for _shingle in simhash.shingle(content, window_size)]
+        hashes = [simhash.unsigned_hash(s.encode("utf-8")) for s in shingles]
+        return simhash.compute(hashes)
 
     def create_entry(self, url, response_code=200, response_content="response content"):
         response = StaticResponse(response_code, {}, response_content)
