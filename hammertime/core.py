@@ -150,7 +150,6 @@ class Stats:
 
     def __init__(self):
         self.init = time.time()
-
         self.requested = 0
         self.completed = 0
         self.retries = 0
@@ -162,7 +161,3 @@ class Stats:
     @property
     def rate(self):
         return self.completed / self.duration
-
-    def __repr__(self):
-        return "Requested: {}, completed: {}, retries: {}, elapsed time: {}, request rate: {}".format(self.requested, self.completed,
-                                                                                    self.retries, self.duration, self.completed / self.duration)

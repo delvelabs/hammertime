@@ -79,7 +79,7 @@ class DetectSoft404:
                     raise RejectRequest("Request is a soft 404.")
 
     async def _collect_sample(self, entry, url_pattern):
-        url = self._create_random_url_for_url(entry.request.url, url_pattern)
+        url = self._create_random_url(entry.request.url, url_pattern)
         request = Entry.create(url)
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
         return {"pattern": url_pattern, "code": result.response.code, "content": result.response.content}
@@ -137,13 +137,13 @@ class DetectSoft404:
                     pattern_list.append("\w")
         return pattern.format(*pattern_list)
 
-    def _create_random_url_for_url(self, url, path):
+    def _create_random_url(self, url, path):
         replace_patterns = ["\l", "\L", "\i", "\d", "\w"]
         for pattern in replace_patterns:
-            path = path.replace(pattern, self._create_random_pattern(pattern, random.randint(4, 8)))
+            path = path.replace(pattern, self._create_random_string(pattern, random.randint(8, 15)))
         return urljoin(url, path)
 
-    def _create_random_pattern(self, pattern, length):
+    def _create_random_string(self, pattern, length):
         choices = None
         if pattern == "\l":
             choices = string.ascii_lowercase
