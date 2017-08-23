@@ -23,14 +23,14 @@ try:
     class Simhash:
 
         def __init__(self, data):
-            self.data = data
+            self.value = self.compute(data)
 
         def distance(self, hash):
-            return num_differing_bits(self.compute(), hash.compute())
+            return num_differing_bits(self.value, hash.value)
 
-        def compute(self):
+        def compute(self, data):
             window_size = 4
-            content = self.data.lower()
+            content = data.lower()
             shingles = [''.join(_shingle) for _shingle in shingle(content, window_size)]
             hashes = [unsigned_hash(s.encode("utf-8")) for s in sorted(shingles)]
             return compute(hashes)
