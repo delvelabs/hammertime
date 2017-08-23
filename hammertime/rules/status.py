@@ -74,9 +74,6 @@ class DetectSoft404:
         if entry.request.url == server_address:
             return
 
-        if len(entry.response.content) == 0:
-            raise RejectRequest("Request is a soft 404.")
-
         for result in self.soft_404_responses[server_address]:
             if result["pattern"] == request_url_pattern:
                 if result["code"] == entry.response.code and self._content_match(entry.response.content,
