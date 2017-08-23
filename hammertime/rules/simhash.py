@@ -23,7 +23,10 @@ try:
     class Simhash:
 
         def __init__(self, data):
-            self.value = self.compute(data)
+            if isinstance(data, int):
+                self.value = data
+            else:
+                self.value = self.compute(data)
 
         def distance(self, hash):
             return num_differing_bits(self.value, hash.value)

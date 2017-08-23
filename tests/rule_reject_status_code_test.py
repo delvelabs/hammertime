@@ -18,17 +18,17 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 from urllib.parse import urljoin, urlparse
+import re
+import uuid
+import random
 
 from fixtures import async_test
-
 from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest
 from hammertime.engine import Engine
 from hammertime.kb import KnowledgeBase
-import re
-import uuid
-import random
+from hammertime.rules.simhash import Simhash
 
 
 class RejectStatusCodeTest(TestCase):
@@ -120,18 +120,19 @@ class DetectSoft404Test(TestCase):
         await self.rule.after_response(self.create_entry("http://example.com/.test", response_content="response"))
         await self.rule.after_response(self.create_entry("http://example.com/123/test.js", response_content="response"))
 
-        self.assertEqual(self.kb.soft_404_responses["http://example.com/"],
-                         [{"pattern": "/\l", "code": 200, "content": "response content"},
-                          {"pattern": "/\d/", "code": 200, "content": "response content"},
-                          {"pattern": "/.\l", "code": 200, "content": "response content"},
-                          {"pattern": "/\d/\l.js", "code": 200, "content": "response content"}])
+        simhash = Simhash(response.content).value
+        self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
+            "/\l": {"code": 200, "content_simhash": simhash},
+            "/\d/": {"code": 200, "content_simhash": simhash},
+            "/.\l": {"code": 200, "content_simhash": simhash},
+            "/\d/\l.js": {"code": 200, "content_simhash": simhash}})
 
     @async_test()
     async def test_reject_request_if_pattern_and_response_match_request_in_knowledge_base(self):
         for pattern in self.patterns:
-            self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
-                                                                      "content": "response content"})
-            self.rule.performed["http://example.com/"] = {pattern: None}
+            simhash = Simhash("response content").value
+            self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
+            self.rule.performed["http://example.com/"][pattern] = None
 
         urls = [urljoin("http://example.com/", path) for path in ["/test/123.html", "/123-test.js", "/TEST/", "/TesT",
                                                                   "/.test.js"]]
@@ -141,9 +142,9 @@ class DetectSoft404Test(TestCase):
 
     @async_test()
     async def test_dont_reject_request_if_no_match_in_knowledge_base(self):
+        simhash = Simhash("response content").value
         for pattern in self.patterns:
-            self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
-                                                                      "content": "response content"})
+            self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
             self.rule.performed["http://example.com/"] = {pattern: None}
 
         try:
@@ -156,9 +157,9 @@ class DetectSoft404Test(TestCase):
 
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
+        simhash = Simhash("response content").value
         for pattern in self.patterns:
-            self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
-                                                                      "content": "home page"})
+            self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
             self.rule.performed["http://example.com/"] = {pattern: None}
         try:
             await self.rule.after_response(self.create_entry("http://example.com/", response_content="home page"))

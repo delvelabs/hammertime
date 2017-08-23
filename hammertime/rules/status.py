@@ -18,15 +18,15 @@
 
 import asyncio
 from urllib.parse import urljoin, urlparse
-
-from ..ruleset import RejectRequest, Heuristics
-from ..http import Entry
-from .simhash import Simhash
 import os
 from collections import defaultdict
 import re
 import random
 import string
+
+from ..ruleset import RejectRequest, Heuristics
+from ..http import Entry
+from .simhash import Simhash
 
 
 class RejectStatusCode:
@@ -43,11 +43,12 @@ class RejectStatusCode:
 
 class DetectSoft404:
 
-    def __init__(self):
+    def __init__(self, distance_threshold=5):
         self.engine = None
         self.child_heuristics = Heuristics()
         self.performed = defaultdict(dict)
-        self.soft_404_responses = defaultdict(list)
+        self.soft_404_responses = defaultdict(dict)
+        self.distance_threshold = distance_threshold
 
     def set_engine(self, engine):
         self.engine = engine
@@ -56,38 +57,40 @@ class DetectSoft404:
         kb.soft_404_responses = self.soft_404_responses
 
     async def after_response(self, entry):
-        server_address = urljoin(entry.request.url, "/")
-        request_url_pattern = self._extract_pattern_from_url(entry.request.url)
-        if server_address not in self.performed or request_url_pattern not in self.performed[server_address]:
+        soft_404_response = await self.get_soft_404_sample(entry.request.url)
+        if soft_404_response is not None and self._match(entry.response, soft_404_response):
+            raise RejectRequest("Request is a soft 404.")
+
+    async def get_soft_404_sample(self, url):
+        server_address = urljoin(url, "/")
+        if url == server_address:  # skip home page.
+            return None
+        request_url_pattern = self._extract_pattern_from_url(url)
+        if request_url_pattern not in self.performed[server_address]:
             # Temporarily assign a future to make sure work is not done twice
             self.performed[server_address][request_url_pattern] = asyncio.Future()
-            response = await self._collect_sample(entry, request_url_pattern)
-            self.soft_404_responses[server_address].append(response)
+            response = await self._collect_sample(url, request_url_pattern)
+            self.soft_404_responses[server_address][request_url_pattern] = response
             self.performed[server_address][request_url_pattern].set_result(True)
             # Remove the wait lock
             self.performed[server_address][request_url_pattern] = None
         elif self.performed[server_address][request_url_pattern] is not None:
             await self.performed[server_address][request_url_pattern]
+        return self.soft_404_responses[server_address][request_url_pattern]
 
-        if entry.request.url == server_address:
-            return
-
-        for result in self.soft_404_responses[server_address]:
-            if result["pattern"] == request_url_pattern:
-                if result["code"] == entry.response.code and self._content_match(entry.response.content,
-                                                                                 result["content"]):
-                    raise RejectRequest("Request is a soft 404.")
-
-    async def _collect_sample(self, entry, url_pattern):
-        url = self._create_random_url(entry.request.url, url_pattern)
+    async def _collect_sample(self, url, url_pattern):
+        url = self._create_random_url(url, url_pattern)
         request = Entry.create(url)
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
-        return {"pattern": url_pattern, "code": result.response.code, "content": result.response.content}
+        simhash = Simhash(result.response.content).value
+        return {"code": result.response.code, "content_simhash": simhash}
 
-    def _content_match(self, response_content, soft_404_content):
-        if response_content == soft_404_content:
-            return True
-        return Simhash(response_content).distance(Simhash(soft_404_content)) < 5
+    def _match(self, response, soft_404_response):
+        if soft_404_response["code"] == response.code:
+            return Simhash(response.content).distance(Simhash(soft_404_response["content_simhash"])) < \
+                   self.distance_threshold
+        else:
+            return False
 
     def _extract_pattern_from_url(self, url):
         """Return the pattern of the path part of the URL in a regex-like format:
