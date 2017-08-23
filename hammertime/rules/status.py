@@ -17,7 +17,6 @@
 
 
 import asyncio
-import uuid
 from urllib.parse import urljoin, urlparse
 
 from ..ruleset import RejectRequest, Heuristics
@@ -46,7 +45,6 @@ class DetectSoft404:
 
     def __init__(self):
         self.engine = None
-        self.random_token = str(uuid.uuid4())
         self.child_heuristics = Heuristics()
         self.performed = defaultdict(dict)
         self.soft_404_responses = defaultdict(list)
@@ -92,6 +90,14 @@ class DetectSoft404:
         return Simhash(response_content).distance(Simhash(soft_404_content)) < 5
 
     def _extract_pattern_from_url(self, url):
+        """Return the pattern of the path part of the URL in a regex-like format:
+        \l -> lowercase letters, same as [a-z]+
+        \L -> uppercase letters, same as [A-Z]+
+        \i -> letters ignoring case, same as [a-zA-Z]+
+        \d -> digits, same as \d+
+        \w -> word characters (letters, digits, underscores), same as \w+
+        All other characters match themselves
+        """
         path = urlparse(url).path
         directory_pattern = self._extract_directory_pattern(path)
         filename_pattern = self._extract_filename_pattern_from_url_path(path)

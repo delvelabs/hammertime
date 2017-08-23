@@ -17,7 +17,6 @@
 
 
 try:
-    raise ImportError
     from simhash import shingle, unsigned_hash, compute, num_differing_bits
 
 
@@ -38,7 +37,7 @@ try:
 
 
 except ImportError:
-    from simhash2.simhash import Simhash as _Simhash
+    from simhash import Simhash as _Simhash
 
 
     def Simhash(data):

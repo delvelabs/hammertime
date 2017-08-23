@@ -64,7 +64,6 @@ class DetectSoft404Test(TestCase):
 
     def setUp(self):
         self.rule = DetectSoft404()
-        self.rule.random_token = "not-so-random"
         self.engine = FakeEngine()
         self.rule.set_engine(self.engine)
         self.kb = KnowledgeBase()
@@ -72,22 +71,13 @@ class DetectSoft404Test(TestCase):
         self.patterns = ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]
 
     @async_test()
-    async def test_calls_made_to_random_url_matching_target_url_pattern(self):
-        self.rule._create_random_url_for_url = MagicMock(return_value="http://example.com/random.html")
-
-        await self.rule.after_response(self.create_entry("http://example.com/test.html", response_code=400))
-
-        self.engine.mock.perform_high_priority.assert_has_calls([
-            call(Entry.create("http://example.com/random.html"), self.rule.child_heuristics)],
-            any_order=True)
-
-    @async_test()
     async def test_call_made_to_alternate_url_for_request_url_pattern(self):
         response = StaticResponse(200, {}, content="content")
         self.engine.mock.perform_high_priority.side_effect = lambda entry, heuristics: entry._replace(response=response)
         module_path = "hammertime.rules.status.string"
         with patch(module_path + ".ascii_uppercase", "A"), patch(module_path + ".ascii_lowercase", "a"), \
-             patch(module_path + ".digits", "1"), patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
+             patch(module_path + ".digits", "1"), \
+             patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
 
             await self.rule.after_response(self.create_entry("http://example.com/test"))
             await self.rule.after_response(self.create_entry("http://example.com/test/"))
@@ -111,11 +101,11 @@ class DetectSoft404Test(TestCase):
 
     @async_test()
     async def test_calls_not_made_second_time_around(self):
-        await self.rule.after_response(self.create_entry("http://example.com/test", response_code=400))
+        await self.rule.after_response(self.create_entry("http://example.com/test"))
 
         self.engine.mock.reset_mock()
 
-        await self.rule.after_response(self.create_entry("http://example.com/test", response_code=400))
+        await self.rule.after_response(self.create_entry("http://example.com/test"))
 
         self.engine.mock.perform_high_priority.assert_not_called()
 
@@ -137,7 +127,7 @@ class DetectSoft404Test(TestCase):
                           {"pattern": "/\d/\l.js", "code": 200, "content": "response content"}])
 
     @async_test()
-    async def test_reject_request_with_pattern_and_response_matching_knowledge_base(self):
+    async def test_reject_request_if_pattern_and_response_match_request_in_knowledge_base(self):
         for pattern in self.patterns:
             self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
                                                                       "content": "response content"})
@@ -150,7 +140,7 @@ class DetectSoft404Test(TestCase):
                 await self.rule.after_response(self.create_entry(url))
 
     @async_test()
-    async def test_dont_reject_request_if_pattern_and_response_not_in_knowledge_base(self):
+    async def test_dont_reject_request_if_no_match_in_knowledge_base(self):
         for pattern in self.patterns:
             self.kb.soft_404_responses["http://example.com/"].append({"pattern": pattern, "code": 200,
                                                                       "content": "response content"})
@@ -224,7 +214,7 @@ class DetectSoft404Test(TestCase):
         expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/\w/", "/.\l/", "/.\d/", "/\d-\l/", "/.\L-\d/", "/", "/"]
         self.assertEqual(directory_patterns, expected)
 
-    def test_extract_directory_pattern_from_url_path_return_pattern_of_first_directory(self):
+    def test_extract_directory_pattern_from_url_path_return_only_pattern_of_first_directory(self):
         paths = ["/test/123/", "/123/test/", "/TEST/test/", "/teST/123/", "/.test/123/", "/.123/test/", "/123-test/12/",
                  "/123/test-123/"]
         filenames = ["test.json", "test.html", "test.js", "", "test", ".test", "test.123.php"]
