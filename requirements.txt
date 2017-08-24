@@ -1,4 +1,4 @@
 aiohttp==2.0.5
 aiodns==1.1.1
 easyinject==0.3
-simhash==1.7.1
+simhash==1.8.0

@@ -23,6 +23,7 @@ from collections import defaultdict
 import re
 import random
 import string
+import hashlib
 
 from ..ruleset import RejectRequest, Heuristics
 from ..http import Entry
@@ -82,13 +83,22 @@ class DetectSoft404:
         url = self._create_random_url(url, url_pattern)
         request = Entry.create(url)
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
-        simhash = Simhash(result.response.content).value
-        return {"code": result.response.code, "content_simhash": simhash}
+        try:
+            simhash = Simhash(result.response.content).value
+            return {"code": result.response.code, "content_simhash": simhash}
+        except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
+            return {"code": result.response.code, "raw_content_hash": hashlib.md5(result.response.raw).digest()}
 
     def _match(self, response, soft_404_response):
         if soft_404_response["code"] == response.code:
-            return Simhash(response.content).distance(Simhash(soft_404_response["content_simhash"])) < \
-                   self.distance_threshold
+            if "raw_content_hash" in soft_404_response:
+                return hashlib.md5(response.raw).digest() == soft_404_response["raw_content_hash"]
+            else:
+                try:
+                    return Simhash(response.content).distance(Simhash(soft_404_response["content_simhash"])) < \
+                        self.distance_threshold
+                except UnicodeDecodeError:  # response content is not text, cannot match text.
+                    return False
         else:
             return False
 

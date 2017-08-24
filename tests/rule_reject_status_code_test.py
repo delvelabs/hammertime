@@ -16,11 +16,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, call, patch, PropertyMock
 from urllib.parse import urljoin, urlparse
 import re
 import uuid
 import random
+import hashlib
 
 from fixtures import async_test
 from hammertime.rules import RejectStatusCode, DetectSoft404
@@ -29,6 +30,7 @@ from hammertime.ruleset import RejectRequest
 from hammertime.engine import Engine
 from hammertime.kb import KnowledgeBase
 from hammertime.rules.simhash import Simhash
+from hammertime.engine.aiohttp import Response
 
 
 class RejectStatusCodeTest(TestCase):
@@ -128,6 +130,16 @@ class DetectSoft404Test(TestCase):
             "/\d/\l.js": {"code": 200, "content_simhash": simhash}})
 
     @async_test()
+    async def test_add_hash_of_raw_content_if_response_content_is_not_text(self):
+        response = Response(200, {})
+        response.set_content(b'x\x80Z"\x1a\x98\x8ey\xef?B\xd7\xc5\xbf\xd4\x18', True)
+        self.engine.mock.perform_high_priority.return_value = Entry.create("url", response=response)
+        await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
+
+        self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
+                "/\l": {"code": 200, "raw_content_hash": hashlib.md5(b'x\x80Z"\x1a\x98\x8ey\xef?B\xd7\xc5\xbf\xd4\x18').digest()}})
+
+    @async_test()
     async def test_reject_request_if_pattern_and_response_match_request_in_knowledge_base(self):
         for pattern in self.patterns:
             simhash = Simhash("response content").value
@@ -154,6 +166,25 @@ class DetectSoft404Test(TestCase):
             await self.rule.after_response(self.create_entry("http://example.com/test.php", response_content="test"))
         except RejectRequest:
             self.fail("Request rejected.")
+
+    @async_test()
+    async def test_compare_hash_of_raw_content_if_no_simhash_in_knowledge_base(self):
+        raw = b'x\x80Z"\x1a\x98\x8ey\xef?B\xd7\xc5\xbf\xd4\x18'
+        _hash = hashlib.md5(raw).digest()
+        self.kb.soft_404_responses["http://example.com/"]["/\l"] = {"code": 200, "raw_content_hash": _hash}
+        self.rule.performed["http://example.com/"] = {"/\l": None}
+        response = Response(200, {})
+        response.set_content(raw, True)
+
+        with self.assertRaises(RejectRequest):
+            await self.rule.after_response(Entry.create("http://example.com/test", response=response))
+
+    def test_dont_match_if_simhash_in_knowledge_base_but_response_content_is_not_text(self):
+        raw = b'x\x80Z"\x1a\x98\x8ey\xef?B\xd7\xc5\xbf\xd4\x18'
+        response = Response(200, {})
+        response.set_content(raw, True)
+
+        self.assertFalse(self.rule._match(response, {"code": 200, "content_simhash": 12345}))
 
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
