@@ -27,13 +27,9 @@ class DynamicTimeout:
         self.max_timeout = max_timeout
         self.timeout_manager = TimeoutManager(min_timeout, max_timeout, sample_size)
         self.retries = retries
-        self.request_engine = None
 
     def set_kb(self, kb):
         kb.timeout_manager = self.timeout_manager
-
-    def set_engine(self, request_engine):
-        self.request_engine = request_engine
 
     async def before_request(self, entry):
         if self._is_last_attempt(entry):
@@ -41,7 +37,6 @@ class DynamicTimeout:
         else:
             entry.arguments["timeout"] = self.timeout_manager.get_timeout()
         entry.arguments["start_time"] = time()
-        self.request_engine.timeout = entry.arguments["timeout"]
 
     async def after_headers(self, entry):
         self.timeout_manager.add_successful_request(entry)
