@@ -25,7 +25,7 @@ import random
 import string
 import hashlib
 
-from ..ruleset import RejectRequest, Heuristics
+from ..ruleset import RejectRequest, Heuristics, StopRequest
 from ..http import Entry
 from .simhash import Simhash
 
@@ -68,13 +68,17 @@ class DetectSoft404:
             return None
         request_url_pattern = self._extract_pattern_from_url(url)
         if request_url_pattern not in self.performed[server_address]:
-            # Temporarily assign a future to make sure work is not done twice
-            self.performed[server_address][request_url_pattern] = asyncio.Future()
-            response = await self._collect_sample(url, request_url_pattern)
-            self.soft_404_responses[server_address][request_url_pattern] = response
-            self.performed[server_address][request_url_pattern].set_result(True)
-            # Remove the wait lock
-            self.performed[server_address][request_url_pattern] = None
+            try:
+                # Temporarily assign a future to make sure work is not done twice
+                self.performed[server_address][request_url_pattern] = asyncio.Future()
+                response = await self._collect_sample(url, request_url_pattern)
+                self.soft_404_responses[server_address][request_url_pattern] = response
+            except (StopRequest, RejectRequest):
+                self.soft_404_responses[server_address][request_url_pattern] = None
+            finally:
+                # Remove the wait lock
+                self.performed[server_address][request_url_pattern].set_result(True)
+                self.performed[server_address][request_url_pattern] = None
         elif self.performed[server_address][request_url_pattern] is not None:
             await self.performed[server_address][request_url_pattern]
         return self.soft_404_responses[server_address][request_url_pattern]

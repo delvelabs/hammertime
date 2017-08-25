@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock, call, patch, PropertyMock
+from unittest.mock import MagicMock, call, patch
 from urllib.parse import urljoin, urlparse
 import re
 import uuid
@@ -26,7 +26,7 @@ import hashlib
 from fixtures import async_test
 from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
-from hammertime.ruleset import RejectRequest
+from hammertime.ruleset import RejectRequest, StopRequest
 from hammertime.engine import Engine
 from hammertime.kb import KnowledgeBase
 from hammertime.rules.simhash import Simhash
@@ -112,6 +112,14 @@ class DetectSoft404Test(TestCase):
         self.engine.mock.perform_high_priority.assert_not_called()
 
     @async_test()
+    async def test_remove_lock_if_stop_request_raised(self):
+        self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
+
+        await self.rule.after_response(self.create_entry("http://example.com/test"))
+
+        self.assertEqual(self.rule.performed["http://example.com/"]["/\l"], None)
+
+    @async_test()
     async def test_add_alternate_url_response_to_knowledge_base(self):
         response = StaticResponse(200, {})
         response.content = "response content"
@@ -128,6 +136,14 @@ class DetectSoft404Test(TestCase):
             "/\d/": {"code": 200, "content_simhash": simhash},
             "/.\l": {"code": 200, "content_simhash": simhash},
             "/\d/\l.js": {"code": 200, "content_simhash": simhash}})
+
+    @async_test()
+    async def test_add_None_to_knowledge_base_if_request_failed(self):
+        self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
+
+        await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
+
+        self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {"/\l": None})
 
     @async_test()
     async def test_add_hash_of_raw_content_if_response_content_is_not_text(self):
@@ -164,6 +180,15 @@ class DetectSoft404Test(TestCase):
             await self.rule.after_response(self.create_entry("http://example.com/test", response_content="test"))
             await self.rule.after_response(self.create_entry("http://example.com/.test", response_content="test"))
             await self.rule.after_response(self.create_entry("http://example.com/test.php", response_content="test"))
+        except RejectRequest:
+            self.fail("Request rejected.")
+
+    @async_test()
+    async def test_dont_reject_request_if_response_in_knowledge_base_is_none(self):
+        self.kb.soft_404_responses["http://example.com/"]["/\l"] = None
+        self.rule.performed["http://example.com/"] = {"/\l": None}
+        try:
+            await self.rule.after_response(self.create_entry("http://example.com/test", response_content="test"))
         except RejectRequest:
             self.fail("Request rejected.")
 
