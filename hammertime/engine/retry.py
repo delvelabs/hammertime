@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import asyncio
+from weakref import ref as weakref
 
 from . import Engine
 from ..ruleset import StopRequest
@@ -27,10 +28,21 @@ class RetryEngine(Engine):
         self.request_engine = engine
         self.retry_count = retry_count
         self.stats = stats
-        self.limiter = asyncio.Semaphore(50, loop=loop)
+        self.general_limiter = asyncio.Semaphore(50, loop=loop)
+        self.priority_limiter = asyncio.Semaphore(10, loop=loop)
+        self.default_heuristics = None
 
     async def perform(self, entry, heuristics):
-        async with self.limiter:
+        if self.default_heuristics is None:
+            self.default_heuristics = weakref(heuristics)
+
+        return await self._perform(self.general_limiter, entry, heuristics)
+
+    async def perform_high_priority(self, entry, heuristics=None):
+        return await self._perform(self.priority_limiter, entry, heuristics or self.default_heuristics())
+
+    async def _perform(self, limiter, entry, heuristics):
+        async with limiter:
             while True:
                 try:
                     entry = await self.request_engine.perform(entry, heuristics=heuristics)
