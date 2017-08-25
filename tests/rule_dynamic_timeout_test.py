@@ -37,8 +37,6 @@ class DynamicTimeoutTest(TestCase):
                                    sample_size=self.sample_size)
         self.knowledge_base = KnowledgeBase()
         self.rule.set_kb(self.knowledge_base)
-        self.fake_engine = MagicMock()
-        self.rule.set_engine(self.fake_engine)
         self.entry_factory = lambda: Entry.create("http://example.com")
 
     @async_test()
