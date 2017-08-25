@@ -18,14 +18,17 @@
 
 import re
 
+
+DEFAULT_FILTER = r'[\w\u4e00-\u9fcc<>]+'
+
 try:
     from simhash import shingle, unsigned_hash, compute, num_differing_bits
 
 
     class Simhash:
 
-        def __init__(self, data, filter=None, token_size=4):
-            self.filter = re.compile(filter or r'[\w\u4e00-\u9fcc<>]+')
+        def __init__(self, data, filter=DEFAULT_FILTER, token_size=4):
+            self.filter = re.compile(filter)
             if isinstance(data, int):
                 self.value = data
             else:
@@ -48,9 +51,9 @@ except ImportError:
 
     class Simhash(_Simhash):
 
-        def __init__(self, data, filter=None, token_size=4):
+        def __init__(self, data, filter=DEFAULT_FILTER, token_size=4):
             self.token_size = token_size
-            super().__init__(data, reg=filter or r'[\w\u4e00-\u9fcc<>]+')
+            super().__init__(data, reg=filter)
 
         def _tokenize(self, content):
             content = content.lower()

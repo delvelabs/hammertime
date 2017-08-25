@@ -103,6 +103,8 @@ class DetectSoft404Test(TestCase):
 
     @async_test()
     async def test_calls_not_made_second_time_around(self):
+        entry = self.create_entry("http://example.com/test", response_content="response")
+        self.engine.mock.perform_high_priority.return_value = entry
         await self.rule.after_response(self.create_entry("http://example.com/test"))
 
         self.engine.mock.reset_mock()
@@ -171,10 +173,9 @@ class DetectSoft404Test(TestCase):
     @async_test()
     async def test_dont_reject_request_if_no_match_in_knowledge_base(self):
         simhash = Simhash("response content").value
-        for pattern in self.patterns:
+        for pattern in ["/\l.html", "/\l", "/.\l", "/\l.php"]:
             self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
-            self.rule.performed["http://example.com/"] = {pattern: None}
-
+            self.rule.performed["http://example.com/"][pattern] = None
         try:
             await self.rule.after_response(self.create_entry("http://example.com/test.html", response_content="test"))
             await self.rule.after_response(self.create_entry("http://example.com/test", response_content="test"))

@@ -27,7 +27,7 @@ import hashlib
 
 from ..ruleset import RejectRequest, Heuristics, StopRequest
 from ..http import Entry
-from .simhash import Simhash
+from .simhash import Simhash, DEFAULT_FILTER
 
 
 class RejectStatusCode:
@@ -44,7 +44,7 @@ class RejectStatusCode:
 
 class DetectSoft404:
 
-    def __init__(self, distance_threshold=5, match_filter=r'[\w\u4e00-\u9fcc<>]+', token_size=4):
+    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4):
         self.engine = None
         self.child_heuristics = Heuristics()
         self.performed = defaultdict(dict)
