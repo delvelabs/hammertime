@@ -44,12 +44,14 @@ class RejectStatusCode:
 
 class DetectSoft404:
 
-    def __init__(self, distance_threshold=5):
+    def __init__(self, distance_threshold=5, match_filter=r'[\w\u4e00-\u9fcc<>]+', token_size=4):
         self.engine = None
         self.child_heuristics = Heuristics()
         self.performed = defaultdict(dict)
         self.soft_404_responses = defaultdict(dict)
         self.distance_threshold = distance_threshold
+        self.match_filter = match_filter
+        self.token_size = token_size
 
     def set_engine(self, engine):
         self.engine = engine
@@ -88,7 +90,7 @@ class DetectSoft404:
         request = Entry.create(url)
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
         try:
-            simhash = Simhash(result.response.content).value
+            simhash = Simhash(result.response.content, filter=self.match_filter, token_size=self.token_size).value
             return {"code": result.response.code, "content_simhash": simhash}
         except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
             return {"code": result.response.code, "raw_content_hash": hashlib.md5(result.response.raw).digest()}
@@ -99,8 +101,8 @@ class DetectSoft404:
                 return hashlib.md5(response.raw).digest() == soft_404_response["raw_content_hash"]
             else:
                 try:
-                    return Simhash(response.content).distance(Simhash(soft_404_response["content_simhash"])) < \
-                        self.distance_threshold
+                    resp_hash = Simhash(response.content, filter=self.match_filter, token_size=self.token_size)
+                    return resp_hash.distance(Simhash(soft_404_response["content_simhash"])) < self.distance_threshold
                 except UnicodeDecodeError:  # response content is not text, cannot match text.
                     return False
         else:

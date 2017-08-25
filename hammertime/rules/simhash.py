@@ -16,25 +16,28 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+import re
+
 try:
     from simhash import shingle, unsigned_hash, compute, num_differing_bits
 
 
     class Simhash:
 
-        def __init__(self, data):
+        def __init__(self, data, filter=None, token_size=4):
+            self.filter = re.compile(filter or r'[\w\u4e00-\u9fcc<>]+')
             if isinstance(data, int):
                 self.value = data
             else:
-                self.value = self.compute(data)
+                self.value = self.compute(data, token_size)
 
         def distance(self, hash):
             return num_differing_bits(self.value, hash.value)
 
-        def compute(self, data):
-            window_size = 4
+        def compute(self, data, token_size):
             content = data.lower()
-            shingles = [''.join(_shingle) for _shingle in shingle(content, window_size)]
+            content = ''.join(self.filter.findall(content))
+            shingles = [''.join(_shingle) for _shingle in shingle(content, token_size)]
             hashes = [unsigned_hash(s.encode("utf-8")) for s in sorted(shingles)]
             return compute(hashes)
 
@@ -43,5 +46,14 @@ except ImportError:
     from simhash import Simhash as _Simhash
 
 
-    def Simhash(data):
-        return _Simhash(data, reg=".+")
+    class Simhash(_Simhash):
+
+        def __init__(self, data, filter=None, token_size=4):
+            self.token_size = token_size
+            super().__init__(data, reg=filter or r'[\w\u4e00-\u9fcc<>]+')
+
+        def _tokenize(self, content):
+            content = content.lower()
+            content = ''.join(re.findall(self.reg, content))
+            tokens = self._slide(content, self.token_size)
+            return tokens
