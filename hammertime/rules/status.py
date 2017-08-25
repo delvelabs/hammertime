@@ -73,7 +73,7 @@ class DetectSoft404:
                 self.performed[server_address][request_url_pattern] = asyncio.Future()
                 response = await self._collect_sample(url, request_url_pattern)
                 self.soft_404_responses[server_address][request_url_pattern] = response
-            except StopRequest:
+            except (StopRequest, RejectRequest):
                 self.soft_404_responses[server_address][request_url_pattern] = None
             finally:
                 # Remove the wait lock

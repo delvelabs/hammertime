@@ -2,8 +2,8 @@
 
 from setuptools import setup
 
-setup(name='HammerTime',
-      version='0.1',
+setup(name='HammerTime-http',
+      version='0.1.0',
       description='HammerTime is an HTTP client library aiming to perform a large number of requests on a server as fast as it can take them, but without distrupting operations significantly.',
       author='Delve Labs inc.',
       author_email='info@delvelabs.ca',
@@ -15,6 +15,7 @@ setup(name='HammerTime',
           'aiohttp',
           'async_timeout',
           'easyinject',
+          'simhash',
       ],
       license="GPLv2"
      )
