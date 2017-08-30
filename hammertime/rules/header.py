@@ -15,16 +15,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .body import IgnoreLargeBody
-from .header import SetHeader
-from .status import RejectStatusCode, DetectSoft404
-from .timeout import DynamicTimeout
 
+class SetHeader:
 
-__all__ = [
-    DetectSoft404,
-    DynamicTimeout,
-    IgnoreLargeBody,
-    RejectStatusCode,
-    SetHeader,
-]
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    async def before_request(self, entry):
+        entry.request.headers[self.name] = self.value

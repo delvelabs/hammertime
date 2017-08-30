@@ -15,16 +15,19 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .body import IgnoreLargeBody
-from .header import SetHeader
-from .status import RejectStatusCode, DetectSoft404
-from .timeout import DynamicTimeout
+import unittest
+from fixtures import async_test
+
+from hammertime.http import Entry
+from hammertime.rules.header import SetHeader
 
 
-__all__ = [
-    DetectSoft404,
-    DynamicTimeout,
-    IgnoreLargeBody,
-    RejectStatusCode,
-    SetHeader,
-]
+class SetHeaderTest(unittest.TestCase):
+
+    @async_test()
+    async def test_set_header(self):
+        rule = SetHeader("User-Agent", "HammerTime 1.2")
+        entry = Entry.create("http://example.coM")
+        await rule.before_request(entry)
+
+        self.assertEqual("HammerTime 1.2", entry.request.headers["User-Agent"])
