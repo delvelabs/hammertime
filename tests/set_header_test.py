@@ -27,7 +27,7 @@ class SetHeaderTest(unittest.TestCase):
     @async_test()
     async def test_set_header(self):
         rule = SetHeader("User-Agent", "HammerTime 1.2")
-        entry = Entry.create("http://example.coM")
+        entry = Entry.create("http://example.com")
         await rule.before_request(entry)
 
         self.assertEqual("HammerTime 1.2", entry.request.headers["User-Agent"])
