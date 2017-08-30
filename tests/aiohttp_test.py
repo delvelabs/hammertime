@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, ANY
 from fixtures import async_test
 
 from hammertime.engine.aiohttp import AioHttpEngine
@@ -75,6 +75,19 @@ class TestAioHttpEngine(TestCase):
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=10, proxy="http://some.proxy.com/")
+
+    @async_test()
+    async def test_specify_header(self, loop):
+        asyncio.set_event_loop(loop)
+        engine = AioHttpEngine(loop=loop)
+        engine.session.request = make_mocked_coro(return_value=FakeResponse())
+        entry = Entry.create("http://www.example.com/1", headers={"User-Agent": "Hammertime 1.2.3"})
+
+        await engine.perform(entry, Heuristics())
+
+        engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
+                                                       timeout=ANY,
+                                                       headers={"User-Agent": "Hammertime 1.2.3"})
 
 
 class FakeResponse:
