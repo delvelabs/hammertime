@@ -15,11 +15,4 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .core import HammerTime
-from .config import defaults
-from .__version__ import __version__
-
-
-HammerTime = defaults.wrap(HammerTime)
-
-__all__ = [HammerTime, __version__]
+__version__ = "0.1.2"
