@@ -27,6 +27,7 @@ from hammertime.rules import RejectStatusCode
 from hammertime.engine.aiohttp import AioHttpEngine
 import asyncio
 from aiohttp.test_utils import make_mocked_coro
+import async_timeout
 
 
 class InitTest(TestCase):
@@ -81,6 +82,26 @@ class InitTest(TestCase):
         self.assertEqual(h.completed_count, 2)
 
     @async_test()
+    async def test_successive_loop_over_results(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+        h.request("http://example.com/1")
+        h.request("http://example.com/2")
+        out = set()
+
+        async for entry in h.successful_requests():
+            out.add(entry.response.content)
+
+        h.request("http://example.com/3")
+        h.request("http://example.com/4")
+
+        async for entry in h.successful_requests():
+            out.add(entry.response.content)
+
+        self.assertEqual(out, {"http://example.com/1", "http://example.com/2", "http://example.com/3",
+                               "http://example.com/4"})
+        self.assertEqual(h.completed_count, 4)
+
+    @async_test()
     async def test_skip_results_that_fail(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
         h.heuristics.add(BlockRequest("http://example.com/1"))
@@ -94,6 +115,17 @@ class InitTest(TestCase):
 
         self.assertEqual(out, {"http://example.com/2"})
         self.assertEqual(h.completed_count, 2)
+
+    @async_test()
+    async def test_successful_requests_return_if_no_pending_requests(self, loop):
+        h = HammerTime(loop=loop, request_engine=FakeEngine())
+
+        try:
+            with async_timeout.timeout(0.001):
+                async for entry in h.successful_requests():
+                    pass
+        except asyncio.TimeoutError:
+            self.fail("Function blocked.")
 
     @async_test()
     async def test_provide_exception_when_resolving_specific_promise(self, loop):

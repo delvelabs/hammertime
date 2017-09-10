@@ -63,6 +63,7 @@ class HammerTime:
         self.stats.requested += 1
         task = self.loop.create_task(self._request(*args, **kwargs))
         self.tasks.append(task)
+        task.add_done_callback(self._on_completion)
         return task
 
     async def _request(self, *args, **kwargs):
@@ -77,22 +78,16 @@ class HammerTime:
             logger.exception(e)
         finally:
             self.stats.completed += 1
-            self.loop.call_soon(self._check_completion)
 
     def successful_requests(self):
-        self._check_completion()
+        if len(self.tasks) == 0:
+            self.completed_queue.put_nowait(None)
         return QueueIterator(self.completed_queue)
 
-    def _check_completion(self):
-        try:
-            while True:
-                task = self.tasks.popleft()
-                if task.done():
-                    self._drain(task)
-                else:
-                    self.tasks.appendleft(task)
-                    return
-        except IndexError:
+    def _on_completion(self, task):
+        self._drain(task)
+        self.tasks.remove(task)
+        if len(self.tasks) == 0:
             self.completed_queue.put_nowait(None)
 
     def _drain(self, task):
@@ -139,9 +134,10 @@ class QueueIterator:
                 out = await self.queue.get()
 
             if out is None:
-                raise StopAsyncIteration
-
-            return out
+                if self.queue.empty():
+                    raise StopAsyncIteration
+            else:
+                return out
         except asyncio.queues.QueueEmpty:
             raise StopAsyncIteration
 
