@@ -80,7 +80,7 @@ class HammerTime:
             self.stats.completed += 1
 
     def successful_requests(self):
-        if len(self.tasks) == 0:
+        if len(self.tasks) == 0 and self.completed_queue.qsize() == 0:
             self.completed_queue.put_nowait(None)
         return QueueIterator(self.completed_queue)
 
@@ -134,8 +134,7 @@ class QueueIterator:
                 out = await self.queue.get()
 
             if out is None:
-                if self.queue.empty():
-                    raise StopAsyncIteration
+                raise StopAsyncIteration
             else:
                 return out
         except asyncio.queues.QueueEmpty:
