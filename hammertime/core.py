@@ -135,8 +135,8 @@ class QueueIterator:
 
             if out is None:
                 raise StopAsyncIteration
-            else:
-                return out
+
+            return out
         except asyncio.queues.QueueEmpty:
             raise StopAsyncIteration
 
