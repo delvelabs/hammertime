@@ -60,6 +60,19 @@ async def fetch():
 hammertime.loop.run_until_complete(fetch())
 ```
 
+Or wait for a single request to complete and get its result:
+
+```python
+from hammertime import HammerTime
+
+hammertime = HammerTime()
+
+async def fetch():
+    entry = await hammertime.request("http://example.com/")
+
+hammertime.loop.run_until_complete(fetch())
+```
+
 HammerTime can retry a failed request if a retry count is specified (default is 0, or no retry). This will make 
 HammerTime abandon a request after the fourth attempt (initial request + 3 retries):
 
@@ -74,6 +87,13 @@ To send http requests over a proxy, pass the address of the proxy to HammerTime:
 ```python
 hammertime = HammerTime(proxy="http://127.0.0.1/:8080")
 ```
+
+or use the set_proxy method:
+
+```python
+hammertime = HammerTime()
+hammertime.set_proxy("http://127.0.0.1/:8080")
+ ```
 
 to send https requests over a proxy, pass an instance of an AioHttpEngine to HammerTime, with ssl authentication 
 disabled (not recommended) or the CA certificate of the proxy (recommended):
@@ -90,4 +110,7 @@ engine = AioHttpEngine(loop=loop, ca_certificate_file="path/to/proxy/cert.pem", 
 hammertime = HammerTime(request_engine=engine)
 ```
 
+## Contributing
+
+## Authors and License
 
