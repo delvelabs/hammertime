@@ -207,7 +207,7 @@ class InitTest(TestCase):
 
         self.assertTrue(hammertime.is_closed)
         with self.assertRaises(asyncio.CancelledError):
-            hammertime.request("http://example.com")
+            await hammertime.request("http://example.com")
 
     @async_test()
     async def test_interrupt_close_hammertime(self, loop):

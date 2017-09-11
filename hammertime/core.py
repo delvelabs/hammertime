@@ -59,7 +59,11 @@ class HammerTime:
 
     def request(self, *args, **kwargs):
         if self.is_closed:
-            raise asyncio.CancelledError()
+            # Return an exception as if it were a task when attempting to request on a closed engine
+            future = asyncio.Future(loop=self.loop)
+            future.set_exception(asyncio.CancelledError())
+            return future
+
         self.stats.requested += 1
         task = self.loop.create_task(self._request(*args, **kwargs))
         self.tasks.append(task)
