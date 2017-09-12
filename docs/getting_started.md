@@ -8,19 +8,18 @@
 * Dynamic timeout
 * Support to add custom heuristics
 
+
 ## Installation
+HammerTime requires python 3.5.2
 ```bash
 pip install hammertime-http
 ```
 
-## Dependancies
-* Python 3.5.2
-* aiohttp 2.0.5
-* aiodns
-* easyinject 0.3
-* simhash
-* Optional simhash-py (c++ implementation) as a faster alternative to simhash. A compiler is required for the 
+
+## Optional Dependancies
+* simhash-py (c++ implementation) as a faster alternative to simhash. A compiler is required for the 
 installation. Note that simhash is only used for soft-404 detection.
+* uvloop for a faster implementation of asyncio event loop.
 
 
 ## Getting started
@@ -30,7 +29,19 @@ To send a large number of requests in parallel and retrieve them as soon as they
 ```python
 from hammertime import HammerTime
 
+# Import required heuristics:
+from hammertime.rules import DynamicTimeout, RejectStatusCode
+
 hammertime = HammerTime()
+
+#To add a single heuristic:
+reject_404 = RejectStatusCode([404])
+hammertime.heuristics.add(reject_404)
+
+#To add multiple heuristics:
+reject_5xx = RejectStatusCode(range(500, 600))
+timeout = DynamicTimeout(min_timeout=0.01, max_timeout=1, retries=3)
+hammertime.heuristics.add_multiple([reject_5xx, timeout])
 
 async def fetch():
     for i in range(10000):
@@ -41,7 +52,7 @@ async def fetch():
 hammertime.loop.run_until_complete(fetch())
 ```
 
-With this method, only the entry of successful requests are returned, and no exception are raised when a request fails 
+Note that only the entry of successful requests are returned, and no exception are raised when a request fails 
 or is rejected.
 
 HammerTime.request returns the request wrapped in a asyncio.Task, so you can await for the completion of all requests:
@@ -65,7 +76,7 @@ hammertime.loop.run_until_complete(fetch())
 With this method, HammerTime exceptions are raised when awaiting the future containing a request if that request failed 
 or was rejected.
 
-Or wait for a single request to complete and get its result:
+You can also wait for a single request to complete and get its result:
 
 ```python
 from hammertime import HammerTime
@@ -79,53 +90,9 @@ hammertime.loop.run_until_complete(fetch())
 ```
 This method also raises HammerTime exceptions if the request fails or is rejected.
 
-HammerTime can retry a failed request if a retry count is specified (default is 0, or no retry). This will make 
-HammerTime abandon a request after the fourth attempt (initial request + 3 retries):
+HammerTime can retry a failed request if a retry count is specified (default is 0, or no retry):
 
 ```python
 hammertime = HammerTime(retry_count=3)
 ```
-
-## Proxy support
-
-To send http requests over a proxy, pass the address of the proxy to HammerTime:
-
-```python
-hammertime = HammerTime(proxy="http://127.0.0.1/:8080")
-```
-
-or use the set_proxy method:
-
-```python
-hammertime = HammerTime()
-hammertime.set_proxy("http://127.0.0.1/:8080")
- ```
-
-to send https requests over a proxy, pass an instance of an AioHttpEngine to HammerTime, with ssl authentication 
-disabled (not recommended) or the CA certificate of the proxy (recommended):
-
-```python
-from hammertime.engine.aiohttp import AioHttpEngine
-from hammertime.config import custom_event_loop
-from hammertime import HammerTime
-
-loop = custom_event_loop()
-engine = AioHttpEngine(loop=loop, verify_ssl=False, proxy="http://127.0.0.1/:8080")
-# or
-engine = AioHttpEngine(loop=loop, ca_certificate_file="path/to/proxy/cert.pem", proxy="http://127.0.0.1/:8080")
-hammertime = HammerTime(request_engine=engine)
-```
-
-## Contributing
-Most contributions are welcome. Simply submit a pull request on [GitHub](#https://github.com/delvelabs/hammertime/).
-
-Instruction for contributors:
-* Accept the contributor license agreement.
-* Write tests for your code. Untested code will be rejected.
-
-To report a bug or suggest a feature, open an issue.
-
-## License
-Copyright 2016- Delve Labs inc.
-
-This software is published under the GNU General Public License, version 2.
+This will make HammerTime abandon a request after the fourth attempt (initial request + 3 retries).
