@@ -1,4 +1,4 @@
-# How to use a heuristic
+# Getting Started With Heuristics
 
 To use a single heuristic:
 
@@ -11,7 +11,7 @@ reject_5xx = RejectStatusCode(range(500, 600))
 hammertime.heuristics.add(reject_5xx)
 ```
 
-to use more than one heuristic:
+To use more than one heuristic:
 
 ```python
 from hammertime.rules import RejectStatusCode, DynamicTimeout
@@ -24,59 +24,87 @@ heuristics = [reject_5xx, dynamic_timeout]
 hammertime.heuristics.add_multiple(heuristics)
 ```
 
-## existing heuristics
+When multiple heuristics are added to HammerTime, they are called in the order they were added. For exemple:
 
-class hammertime.rules.RejectStatusCode(*args)
+```python
+heuristic_a = HeuristicA()
+heuristic_b = HeuristicB()
+hammertime.heuristics.add_multiple([heuristicA, heuristicB])
+```
 
-  Used to reject responses based on their HTTP status code.
-  Parameters: * args: iterables containing the status code to reject.
+If both heuristic_a and heuristic_b support the same [event](#events) (e.g. before_request), then the before_request 
+method of heuristic_a will be called before the before_request method of heuristic_b.
 
-class hammertime.rules.IgnoreLargeBody(initial_limit=1024*1024)
+
+## Existing Heuristics
+
+**class hammertime.rules.RejectStatusCode(\*args)**
+
+Used to reject responses based on their HTTP status code.
+  
+Parameters: 
+* args: Iterables containing the status code to reject.
+
+**class hammertime.rules.IgnoreLargeBody(initial_limit=1024\*1024)**
     
-  Dynamically sets a size limit for the body of HTTP responses and truncates larger body at the calculated limit to 
-  prevent large response from decreasing performance.
-  Parameters: * initial_limit: the initial size limit for the response body. Default is 1 MB.
+Dynamically sets a size limit for the body of HTTP responses and truncates larger body at the calculated limit to 
+prevent large response from decreasing performance.
+  
+Parameters: 
+* initial_limit: The initial size limit for the response body. Default is 1 MB.
 
-class hammertime.rules.DynamicTimeout(min_timeout, max_timeout, retries, sample_size=200)
+**class hammertime.rules.DynamicTimeout(min_timeout, max_timeout, retries, sample_size=200)**
     
-  Dynamically adjust the request timeout based on real-time average latency to maximise performance.
-  Parameters: * min_timeout: Minimum value for the request timeout, in seconds.
-              * max_timeout: Maximum value for the request timeout, in seconds
-              * retries: The amount of retries for a failed request
+Dynamically adjust the request timeout based on real-time average latency to maximise performance.
+  
+Parameters: 
+* min_timeout: Minimum value for the request timeout, in seconds.
+* max_timeout: Maximum value for the request timeout, in seconds.
+* retries: The amount of retries for a failed request.
+* sample_size: the amount of requests used to calculate the timeout. for example, if the sample size is 100, the last 
+               100 requests will be used to calculate the timeout. Default is 200.
 
-class hammertime.rules.DetectSoft404(distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4)
+**class hammertime.rules.DetectSoft404(distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4)**
     
-  Detect and reject response for page not found when a server respond with status code 200 instead of 404.
-  Parameters: * distance_threshold: Minimum count of differing bit between two simhash required to consider two 
-  simhash to be different. Default is 5.
-              * match_filter: Regex to filter characters used to compute the simhash of the responses. Default is 
-              r'[\w\u4e00-\u9fcc<>]+'
-              * token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
+Detect and reject response for a page not found when a server does not respond with 404 for pages not found.
+  
+Parameters: 
+* distance_threshold: Minimum count of differing bit between two simhash required to consider two simhash to be 
+                      different. Default is 5.
+* match_filter: Regex to filter characters used to compute the simhash of the responses. Default is 
+                r'[\w\u4e00-\u9fcc<>]+'
+* token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
 
-  The DetectSoft404 heuristic uses its own set of heuristics for the requests it sends (called child heuristics). To 
-  configure those heuristics:
-  ```python
-  from hammertime import HammerTime
-  from hammertime.rules import DetectSoft404, DynamicTimeout
-  
-  hammertime = HammerTime(retry_count=3)
-  timeout = DynamicTimeout(0.05, 2, 3)
-  soft_404_detection = DetectSoft404()
-  soft_404_detection.child_heuristics.add(timeout)
-  hammertime.heuristics.add_multiple((timeout, soft_404_detection))
-  ```
-  
-  
-  
+The DetectSoft404 heuristic uses its own set of heuristics for the requests it sends (called child heuristics). To 
+configure those heuristics:
 
-# How to add a heuristic in HammerTime
+```python
+from hammertime import HammerTime
+from hammertime.rules import DetectSoft404, DynamicTimeout
+  
+hammertime = HammerTime(retry_count=3)
+timeout = DynamicTimeout(0.05, 2, 3)
+soft_404_detection = DetectSoft404()
+soft_404_detection.child_heuristics.add(timeout)
+hammertime.heuristics.add_multiple((timeout, soft_404_detection))
+```
+
+**class hammertime.rules.SetHeader(name, value)**
+
+Set the value of a field in the HTTP header of the requests.
+
+Parameters:
+* name: The name of the field in the HTTP header.
+* value: The value for the field.
+
+
+# How to Add a Custom Heuristic
 
 Heuristics is one of the key concepts in HammerTime, allowing rapid filtering and discarding of responses based on 
 response code as they are received, adjusting the timeout for the requests dynamically to adapt to the server speed, or 
 patching the headers of requests. If the currently available heuristics do not suit all your needs, it is easy to add 
-your own.
+your own. Just create a class with the following interface:
 
-## Interface
 ```python
 class MyHeuristic:
     
@@ -94,22 +122,30 @@ class MyHeuristic:
         
 ```
 
-## Callbacks
+The class for your heuristic must support at least one of the four [events](#events): before_request, after_headers, 
+after_response or on_timeout.
 
-A heuristic define methods that are called at a specific moment or event in a request lifetime. All callbacks take a 
-HammerTime entry as their sole argument. Currently, the existing callbacks for a heuristic are:
+set_engine and set_kb are optional. set_engine allows your heuristic to have a reference to the retry engine of 
+HammerTime. set_kb allows your heuristic to store its data in the [knowledge base](#knowledge-base).
+
+
+## Events
+
+A heuristic define methods that are called at a specific moment in a request lifetime. All callbacks take a HammerTime
+entry as their argument. Currently, the existing events for a heuristic are:
 * before_request: called just before a request is performed. Useful to modify an entry before it is send (e.g. to add 
-headers to the request).
+                  headers to the request).
 * after_headers: called just after a response to a request has been received, but before the response body is read. 
-Useful to discard response based on status code (e.g. discard all 404).
+                 Useful to discard response based on status code (e.g. discard all 404).
 * after_response: called after the content of the response has been read. Useful for filtering based on content.
 * on_timeout: called when the request timeout, before the retry is performed. Useful to log timeout in the knowledge 
-base.
+              base.
 
-To create your own heuristic, defined a class with one or more of the callbacks, depending of what your heuristic need 
+To create your own heuristic, defined a class with one or more of the events, depending of what your heuristic need 
 to do.
 
 Avoid time-consuming operations in heuristics methods, as it can affect the request rate of HammerTime.
+
 
 ## Knowledge base
 
@@ -124,8 +160,3 @@ def set_kb(self, kb):
 ```
 Objects added to the knowledge base need to be serializable, as the knowledge base can be store to a file to be shared 
 between several HammerTime executions.
-
-## Retry engine
-
-The retry engine used by HammerTime can be passed to a heuristic if it needs to send requests when a request is 
-received. Define a method named set_engine in your heuristic.

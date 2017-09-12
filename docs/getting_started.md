@@ -41,6 +41,9 @@ async def fetch():
 hammertime.loop.run_until_complete(fetch())
 ```
 
+With this method, only the entry of successful requests are returned, and no exception are raised when a request fails 
+or is rejected.
+
 HammerTime.request returns the request wrapped in a asyncio.Task, so you can await for the completion of all requests:
 
 ```python
@@ -53,12 +56,14 @@ async def fetch():
     tasks = []
     for i in range(10000):
         tasks.append(hammertime.request("http://example.com/"))
-    entries = await asyncio.wait(tasks, loop=hammertime.loop, return_when=asyncio.ALL_COMPLETED)
-    for entry in entries:
-        pass
+    done, pending = await asyncio.wait(tasks, loop=hammertime.loop, return_when=asyncio.ALL_COMPLETED)
+    for future in done:
+        entry = await future
     
 hammertime.loop.run_until_complete(fetch())
 ```
+With this method, HammerTime exceptions are raised when awaiting the future containing a request if that request failed 
+or was rejected.
 
 Or wait for a single request to complete and get its result:
 
@@ -72,6 +77,7 @@ async def fetch():
 
 hammertime.loop.run_until_complete(fetch())
 ```
+This method also raises HammerTime exceptions if the request fails or is rejected.
 
 HammerTime can retry a failed request if a retry count is specified (default is 0, or no retry). This will make 
 HammerTime abandon a request after the fourth attempt (initial request + 3 retries):
@@ -111,6 +117,15 @@ hammertime = HammerTime(request_engine=engine)
 ```
 
 ## Contributing
+Most contributions are welcome. Simply submit a pull request on [GitHub](#https://github.com/delvelabs/hammertime/).
 
-## Authors and License
+Instruction for contributors:
+* Accept the contributor license agreement.
+* Write tests for your code. Untested code will be rejected.
 
+To report a bug or suggest a feature, open an issue.
+
+## License
+Copyright 2016- Delve Labs inc.
+
+This software is published under the GNU General Public License, version 2.
