@@ -24,7 +24,7 @@ installation. Note that simhash is only used for soft-404 detection.
 
 ## Getting started
 
-To send a large number of requests in parallel and retrieve them as soon as they are done:
+To send a large number of requests in parallel and get each response as soon as the request is done:
 
 ```python
 from hammertime import HammerTime
@@ -32,11 +32,7 @@ from hammertime import HammerTime
 # Import required heuristics:
 from hammertime.rules import DynamicTimeout, RejectStatusCode
 
-hammertime = HammerTime()
-
-#To add a single heuristic:
-reject_404 = RejectStatusCode([404])
-hammertime.heuristics.add(reject_404)
+hammertime = HammerTime(retry_count=3)  # Amount of time HammerTime retries a failed request (default is 0, or no retry)
 
 #To add multiple heuristics:
 reject_5xx = RejectStatusCode(range(500, 600))
@@ -55,13 +51,20 @@ hammertime.loop.run_until_complete(fetch())
 Note that only the entry of successful requests are returned, and no exception are raised when a request fails 
 or is rejected.
 
-HammerTime.request returns the request wrapped in a asyncio.Task, so you can await for the completion of all requests:
+HammerTime.request returns the request wrapped in a asyncio.Task, so you can await for the completion of all requests, 
+or wait for a single request:
 
 ```python
 import asyncio
 from hammertime import HammerTime
+from hammertime.rules import RejectStatusCode
+
 
 hammertime = HammerTime()
+
+#To add a single heuristic:
+reject_404 = RejectStatusCode([404])
+hammertime.heuristics.add(reject_404)
 
 async def fetch():
     tasks = []
@@ -71,28 +74,10 @@ async def fetch():
     for future in done:
         entry = await future
     
-hammertime.loop.run_until_complete(fetch())
-```
-With this method, HammerTime exceptions are raised when awaiting the future containing a request if that request failed 
-or was rejected.
-
-You can also wait for a single request to complete and get its result:
-
-```python
-from hammertime import HammerTime
-
-hammertime = HammerTime()
-
-async def fetch():
+    # Wait for a single request:
     entry = await hammertime.request("http://example.com/")
-
+    
 hammertime.loop.run_until_complete(fetch())
 ```
-This method also raises HammerTime exceptions if the request fails or is rejected.
-
-HammerTime can retry a failed request if a retry count is specified (default is 0, or no retry):
-
-```python
-hammertime = HammerTime(retry_count=3)
-```
-This will make HammerTime abandon a request after the fourth attempt (initial request + 3 retries).
+With these two methods, HammerTime exceptions are raised when awaiting the future containing a request if that request 
+failed or was rejected.

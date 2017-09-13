@@ -11,47 +11,30 @@ Parameters:
 * **loop**: Event loop used by HammerTime. By default, it is uvloop if available, else asyncio event loop is
             used. Except if a custom loop is required, you don't need to pass a loop to HammerTime, as the injector 
             automatically initialize HammerTime with a default loop.
-* **request_engine**: The [AioHttpEngine](#aiohttpengine-class) used to make the HTTP requests. The injector pass a 
-                      AioHttpEngine automatically. A custom instance can be provided if the default values are not 
-                      suitable.
+* **request_engine**: The AioHttpEngine used to make the HTTP requests. The injector pass a AioHttpEngine automatically.
+                      A custom instance can be provided if the default values are not suitable.
 * **kb**: The knowledge base used by the heuristics. The injector creates an empty knowledge base by default.
 * **retry_count**: The amount of time HammerTime will send a request after the initial attempt failed. A retry count of 
                    3 means that a single request can be sent up to 4 times (the inital attempt + 3 retries). Default is
                    0 (no retry).
 * **proxy**: The HTTP proxy used to send the requests. Must be a string containing the proxy URL. Default is none 
              (no proxy).
-                
-**attribute loop**
-
-The event loop used by HammerTime.
     
 **attribute stats**
 
 A [Stats](#stats-class) instance containing the statistics about HammerTime requests (duration, rate, retry count, 
 success count, etc.)
-
-**attribute request_engine**
-
-The [RetryEngine](#retryengine-class) instance used by HammerTime to make the requests.
     
 **attribute heuristics**
 
 A Heuristics instance containing the heuristics used by HammerTime.
-    
-**attribute completed_queue**
-
-A asyncio.Queue containing the entries of the successful requests.
-    
-**attribute tasks**
-
-A collections.deque containing the pending requests (wrapped in asyncio.Tasks).
 
 **attribute closed**
 
 An asyncio.Future used to wait for the completion of the close process of HammerTime. HammerTime will mark this 
 future as done when its closing process is complete. Useful to wait for HammerTime to completely close itself.
 
-**property closed**
+**property is_closed**
 
 Return True if HammerTime as completely closed itself, False otherwise. This property is read-only.
     
