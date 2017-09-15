@@ -1,0 +1,9 @@
+pages:
+- 'getting_started.md'
+- 'create_heuristics.md'
+- 'proxy.md'
+- 'reference.md'
+- 'engine.md'
+- 'heuristics.md'
+- About:
+    - 'License': 'license.md'

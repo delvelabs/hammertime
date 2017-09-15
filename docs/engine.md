@@ -5,6 +5,7 @@
 The engine used by HammerTime to send requests and handle retries if they fail.
 
 Parameters:
+
 * engine: The AioHttpEngine used to send a HTTP request and apply the heuritics to the request.
 * loop: The event loop used by the request engine.
 * stats: The Stats instance used to store statistics about HammerTime.
@@ -14,7 +15,8 @@ Parameters:
 
 The coroutine used to send a request for a HTTP entry and handle retries.
 
-Parameters: 
+Parameters:
+
 * entry: The HTTP entry for the request.
 * heuristics: The heuristics to apply to the request.
 
@@ -26,6 +28,7 @@ The coroutine used to send a request for a HTTP entry and handle retries without
 concurrent requests sent with perform.
 
 Parameters:
+
 * entry: The HTTP entry for the request.
 * heuristics: The heuristics to apply to the request. If none, heuristics used with perform will be used.
 
@@ -40,7 +43,8 @@ Close the underlying AioHttpEngine.
 
 Set the proxy used to send the requests
     
-Parameters: 
+Parameters:
+
 * proxy: A string containing the URL of the proxy.
     
 
@@ -50,7 +54,8 @@ Parameters:
 
 The engine used to send HTTP requests.
 
-Parameters: 
+Parameters:
+
 * loop: The asyncio event loop used to send the requests asynchronously.
 * verify_ssl: True if SSL authentication should be done. Setting this to False is not recommended for security reasons.
               Default is True.
@@ -63,7 +68,8 @@ Parameters:
 
 Send a HTTP request and apply heuristics to the request.
 
-Parameters: 
+Parameters:
+
 * entry: The entry for the HTTP request.
 * heuristics: The heuristics to apply to the entry.
 
@@ -75,5 +81,6 @@ Close the underlying aiohttp session.
 
 Set the proxy to use to send requests
 
-Parameters: 
+Parameters:
+
 * proxy: A string containing the URL of the proxy.

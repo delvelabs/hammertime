@@ -42,7 +42,8 @@ method of heuristic_a will be called before the before_request method of heurist
 
 Used to reject responses based on their HTTP status code.
   
-Parameters: 
+Parameters:
+
 * args: Iterables containing the status code to reject.
 
 **class hammertime.rules.IgnoreLargeBody(initial_limit=1024\*1024)**
@@ -50,14 +51,16 @@ Parameters:
 Dynamically sets a size limit for the body of HTTP responses and truncates larger body at the calculated limit to 
 prevent large response from decreasing performance.
   
-Parameters: 
+Parameters:
+
 * initial_limit: The initial size limit for the response body. Default is 1 MB.
 
 **class hammertime.rules.DynamicTimeout(min_timeout, max_timeout, retries, sample_size=200)**
     
 Dynamically adjust the request timeout based on real-time average latency to maximise performance.
   
-Parameters: 
+Parameters:
+
 * min_timeout: Minimum value for the request timeout, in seconds.
 * max_timeout: Maximum value for the request timeout, in seconds.
 * retries: The amount of retries for a failed request.
@@ -68,7 +71,8 @@ Parameters:
     
 Detect and reject response for a page not found when a server does not respond with 404 for pages not found.
   
-Parameters: 
+Parameters:
+
 * distance_threshold: Minimum count of differing bit between two simhash required to consider two simhash to be 
                       different. Default is 5.
 * match_filter: Regex to filter characters used to compute the simhash of the responses. Default is 
@@ -94,5 +98,6 @@ hammertime.heuristics.add_multiple((timeout, soft_404_detection))
 Set the value of a field in the HTTP header of the requests.
 
 Parameters:
+
 * name: The name of the field in the HTTP header.
 * value: The value for the field.

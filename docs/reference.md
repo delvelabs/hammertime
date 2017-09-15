@@ -7,7 +7,8 @@
 
 The core class of HammerTime to make requests
 
-Parameters:  
+Parameters:
+
 * **loop**: Event loop used by HammerTime. By default, it is uvloop if available, else asyncio event loop is
             used. Except if a custom loop is required, you don't need to pass a loop to HammerTime, as the injector 
             automatically initialize HammerTime with a default loop.
@@ -19,7 +20,7 @@ Parameters:
                    0 (no retry).
 * **proxy**: The HTTP proxy used to send the requests. Must be a string containing the proxy URL. Default is none 
              (no proxy).
-    
+
 **attribute stats**
 
 A [Stats](#stats-class) instance containing the statistics about HammerTime requests (duration, rate, retry count, 
@@ -49,30 +50,33 @@ The amount of requests HammerTime has sent. Retries do not count. This property 
 **method request(\*args, \*\*kwargs)**
 
 Create a request and wrap it in a asyncio.Task, scheduling its execution. Return the task wrapping the request.
+
 Parameters:
-    * args: The URL for the request.
-    * kwargs: Optional keyword arguments used to create the [HTTP entry](#entry) with non-default values for *method*
-              or *headers*.
+
+* args: The URL for the request.
+* kwargs: Optional keyword arguments used to create the [HTTP entry](#entry) with non-default values for *method*
+          or *headers*.
     
 Return: An asyncio.Task wrapping the request.
-    
+
 **method successful_requests()**
 
 Return an AsyncIterator with the entries of all successful requests. No exception are raised, and the entry of 
 requests that caused an exception are not returned. Entries are returned as soon as they are available, thus the
 entries are not in the same order as the requests.
-    
+
 Return: An AsyncIterator containing [HTTP entries](#entry) of the successful requests.
-    
+
 **coroutine close()**
 
 Close HammerTime and set the closed future as done.
-    
+
 **method set_proxy(proxy)**
 
 Set the proxy used to send the HTTP requests
 
-Parameters: 
+Parameters:
+
 * proxy: The URL of the HTTP proxy.
 
 
@@ -110,14 +114,15 @@ The amount of completed requests divided by the current duration.
 ## Entry
 
 An entry contains the following attribute:
-* request:
+
+* request:  
     * url: URL of the request
     * method: HTTP method of the request ('GET' by default).
     * headers: A dict with the name/value of the fields in the HTTP header.
-* result: 
+* result:  
     * attempt: The amount of time this request was sent.
     * read_length: The length (in bytes) of the response body that will be read (default is -1, i.e. unlimited).
-* response: 
+* response:  
     * code: The HTTP status code of the response
     * headers = The HTTP headers of the response.
     * content: The content of the response in a string.
