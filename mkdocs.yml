@@ -7,5 +7,4 @@ pages:
 - 'reference.md'
 - 'engine.md'
 - 'heuristics.md'
-- About:
-    - 'License': 'license.md'
+- 'License': 'license.md'
