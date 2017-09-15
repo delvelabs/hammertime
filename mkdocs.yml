@@ -1,4 +1,5 @@
 site_name: HammerTime Documentation
+site_url: /docs/hammertime
 repo_url: https://github.com/delvelabs/hammertime/
 pages:
 - 'getting_started.md'
