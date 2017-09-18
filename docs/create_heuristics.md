@@ -33,6 +33,7 @@ HammerTime. set_kb allows your heuristic to store its data in the [knowledge bas
 
 A heuristic define methods that are called at a specific moment in a request lifetime. All callbacks take a HammerTime
 entry as their argument. Currently, the existing events for a heuristic are:
+
 * before_request: called just before a request is performed. Useful to modify an entry before it is send (e.g. to add 
                   headers to the request).
 * after_headers: called just after a response to a request has been received, but before the response body is read. 

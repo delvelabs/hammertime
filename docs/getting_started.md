@@ -1,14 +1,3 @@
-# HammerTime: HTTP client library for pentest tools
-
-## Features
-* Can perform a large number of requests as fast as the server can take them.
-* Includes heuristics to discard invalid responses.
-* Soft-404 detection
-* Proxy support
-* Dynamic timeout
-* Support to add custom heuristics
-
-
 ## Installation
 HammerTime requires python 3.5.2
 ```bash
