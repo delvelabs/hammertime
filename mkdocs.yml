@@ -7,4 +7,4 @@ pages:
     - Create New Heuristics: create_heuristics.md
     - HammerTime Reference: reference.md
     - Engines Reference: engine.md
-theme: readthedocs
+theme: default
