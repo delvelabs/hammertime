@@ -21,7 +21,7 @@ from hammertime import HammerTime
 # Import required heuristics:
 from hammertime.rules import DynamicTimeout, RejectStatusCode
 
-hammertime = HammerTime(retry_count=3)  # Amount of time HammerTime retries a failed request (default is 0, or no retry)
+hammertime = HammerTime(retry_count=3)  # Retries for failed request (default is 0, or no retry)
 
 #To add multiple heuristics:
 reject_5xx = RejectStatusCode(range(500, 600))
@@ -59,7 +59,8 @@ async def fetch():
     tasks = []
     for i in range(10000):
         tasks.append(hammertime.request("http://example.com/"))
-    done, pending = await asyncio.wait(tasks, loop=hammertime.loop, return_when=asyncio.ALL_COMPLETED)
+    done, pending = await asyncio.wait(tasks, loop=hammertime.loop, 
+                                       return_when=asyncio.ALL_COMPLETED)
     for future in done:
         entry = await future
     
@@ -68,5 +69,5 @@ async def fetch():
     
 hammertime.loop.run_until_complete(fetch())
 ```
-With these two methods, HammerTime exceptions are raised when awaiting the future containing a request if that request 
+When awaiting Hammertime.requests or the future wrapping the entry, an HammerTime exception is raised if the request
 failed or was rejected.

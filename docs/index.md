@@ -14,6 +14,7 @@ requests, filter out invalid responses and generally augment the data available.
 Most contributions are welcome. Simply submit a pull request on [GitHub](#https://github.com/delvelabs/hammertime/).
 
 Instruction for contributors:
+
 * Accept the contributor license agreement.
 * Write tests for your code. Untested code will be rejected.
 

@@ -1,10 +1,10 @@
 site_name: HammerTime Documentation
 pages:
-    - Home: index.md
+    - Introduction: index.md
     - Getting Started: getting_started.md
+    - Using Heuristics: heuristics.md
     - HammerTime Over a Proxy: proxy.md
     - Create New Heuristics: create_heuristics.md
     - HammerTime Reference: reference.md
-    - Heuristics Reference: heuristics.md
     - Engines Reference: engine.md
 theme: readthedocs

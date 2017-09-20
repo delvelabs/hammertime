@@ -28,7 +28,7 @@ success count, etc.)
     
 **attribute heuristics**
 
-A Heuristics instance containing the heuristics used by HammerTime.
+A Heuristics instance containing the [heuristics](heuristics.md) used by HammerTime.
 
 **attribute closed**
 
@@ -73,7 +73,7 @@ Close HammerTime and set the closed future as done.
 
 **method set_proxy(proxy)**
 
-Set the proxy used to send the HTTP requests
+Set the [proxy](proxy.md) used to send the HTTP requests
 
 Parameters:
 

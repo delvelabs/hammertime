@@ -24,7 +24,7 @@ heuristics = [reject_5xx, dynamic_timeout]
 hammertime.heuristics.add_multiple(heuristics)
 ```
 
-When multiple heuristics are added to HammerTime, they are called in the order they were added. For exemple:
+When multiple heuristics are added to HammerTime, they are called in the order they were added. For example:
 
 ```python
 heuristic_a = HeuristicA()
@@ -32,8 +32,8 @@ heuristic_b = HeuristicB()
 hammertime.heuristics.add_multiple([heuristicA, heuristicB])
 ```
 
-If both heuristic_a and heuristic_b support the same event (e.g. before_request), then the before_request 
-method of heuristic_a will be called before the before_request method of heuristic_b.
+If both heuristic_a and heuristic_b support the same [event](create_heuristics.md#events) (e.g. before_request), then 
+the before_request method of heuristic_a will be called before the before_request method of heuristic_b.
 
 
 ## Existing Heuristics
@@ -41,7 +41,7 @@ method of heuristic_a will be called before the before_request method of heurist
 **class hammertime.rules.RejectStatusCode(\*args)**
 
 Used to reject responses based on their HTTP status code.
-  
+
 Parameters:
 
 * args: Iterables containing the status code to reject.
