@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/delvelabs/hammertime.svg?branch=master)](https://travis-ci.org/delvelabs/hammertime)
 [![PyPi](https://badge.fury.io/py/HammerTime-http.svg)](https://badge.fury.io/py/HammerTime-http)
+[![Documentation Status](http://readthedocs.org/projects/hammertime/badge/?version=latest)](http://hammertime.readthedocs.io/en/latest/?badge=latest)
 ![logo](https://raw.githubusercontent.com/delvelabs/hammertime/master/misc/logo.png)
 
 # HammerTime
