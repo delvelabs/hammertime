@@ -12,7 +12,7 @@ pentest tools. As such, a set of heuristics are provided to rapidly discard some
 requests, filter out invalid responses and generally augment the data available.
 
 ## Contributing
-Most contributions are welcome. Simply submit a pull request on [GitHub](#https://github.com/delvelabs/hammertime/).
+Most contributions are welcome. Simply submit a pull request on [GitHub](https://github.com/delvelabs/hammertime/).
 
 Instruction for contributors:
 
