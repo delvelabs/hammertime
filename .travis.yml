@@ -1,8 +1,15 @@
 language: python
 python:
-  - "3.5"
-  #- "nightly" # currently points to 3.6-dev
-# command to install dependencies
-install: "pip install -r requirements.txt && pip install -r requirements-dev.txt"
-# command to run tests
+  - '3.5'
+install: pip install -r requirements.txt && pip install -r requirements-dev.txt
 script: nosetests
+before_deploy:
+    - "./misc/travis-before-deploy.sh"
+deploy:
+  provider: pypi
+  on:
+    tags: true
+  user:
+    secure: Z3A+yZDWacnE6+h0yyfkJIbh7ncpZIs6e49yZmgWZM47NRNUJoZAf7HjU8rPcMaq20G0cR1Nt/byKhILjvqaxzLxzALaob25Y12sOHFZlNSqhw9EHnBDJKdCAXqoVfIL59mW5GxO16gILrgyWgPkDy0RArw6c+oTbstNduiNAPF7GyIZe/l4mIHeR8PtsfA1G4dGk21uFivBWgE4dNtpzyq9cQ9mC49vVWPC8DKo21LfjYhiddUYaumJ4+6xumzW+EDq73SP2OOpC6SUm6ski2I2040CHZsrpQc7wrJuPwN1VIOoKeyHBe84LQVmk9yjsMDBYaxJgENlPb9hydIN3aX/VlVqqHlXo3iF5crqXjqrfCp5L/eXIvt3FjIwN3PygtkMgxR/QcyBIcjOqXYBrtX0u0W9w+YLPPAsAW2Br2tMdRqUbE63hRa2gykeWhtCC0uerJb3N/DlJ0Vb/dwWsuBtLsmappahA8XCOGMZ41nSprg4u8PLzEvBIxjmAxLdeVgcWyvw/HaaOdWipSrPJ5cUq5urnTB+VyHTtLWieAAw5Y0bk6pQvnN858XFqVDGCm3EUcM/e6A2gZnIr7X9HfVPFh5moCcZj6lQO1Rk9c/J9oorGJ0SCnDdQftcSUgz2zSSsNKzdQW0jp5bFP4ChvRKmBln/7zGbv7Htxne02w=
+  password:
+    secure: wySppU2r7ZMMIrOUt5EFycNVqGZbYLnyNdNJQOaWGuIGnO5HJsFN0MravvP4ysDPlyRWgZHbKqO9HaSiGyYkCaIozVr08cGjlt5xPF6Z/c7REH3FgQXhMSAQLNax6ZUFvxK4fOl7SRkOwDbKpV9oLRefe/D4lr/swAYIVzovS0zcGy4ltSL5k/jo+GJMzaPiVnRspxHhAZm7tWyvvOjACMIQWClGS32iFzbnuQK/goyOSq558zKGjN5EiXXWZ59s72G6ZV7/+Vx3EAPKhuv9QjgWDbhc0XiGvmEFlsZexIqQQfvweNlF+ewrEHoEJs8VGczSgd8mFZbuvQN4KLfK39dFXxYDqCNObC/+cHE/SjnRWLBSYA6gr1GfVS36TIlhAlxJMAKxvlEUxTtZ38W9w8Truvv0KdBYlbfJtRuJkZNGRhARxm0CyviR3qOH6qkVccVblrjlom00xouAyjk2tlwN3Iy9HPglTrvHJ1ZM8x9TYHKMX65BZ1ahRyWXWzDjVLtaX4tdZqqPkk6O8aJoRs/KijRZ1bJwPi9NkgsWat9dG8i/KgEknWCicC92i7jiR8zEWNk6xm35sCY/+J210xlIqOTna08e73yOd9h75An5TcIFzF1Mvwq4pfSYFeoe+TWAZS4BsTWA2fa2fpvAIJ732guU40VOpEz1q8JbaFY=
