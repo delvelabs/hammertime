@@ -8,6 +8,7 @@ before_deploy:
 deploy:
   provider: pypi
   skip_cleanup: true
+  distributions: "sdist bdist_wheel"
   on:
     tags: true
   user:
