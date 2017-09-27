@@ -68,7 +68,7 @@ class AioHttpEngine:
             if entry.request.headers:
                 extra_args["headers"] = entry.request.headers
 
-            response = await self.session.request(method=req.method, url=req.url,
+            response = await self.session.request(method=req.method, url=req.url, allow_redirects=False,
                                                   timeout=timeout_value, **extra_args)
 
         # When the request is simply rejected, we want to keep the persistent connection alive
