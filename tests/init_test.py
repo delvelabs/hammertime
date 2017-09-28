@@ -70,6 +70,7 @@ class InitTest(TestCase):
     @async_test()
     async def test_loop_over_results(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
+        h.collect_successful_requests()
         h.request("http://example.com/1")
         h.request("http://example.com/2")
 
@@ -84,6 +85,7 @@ class InitTest(TestCase):
     @async_test()
     async def test_successive_loop_over_results(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
+        h.collect_successful_requests()
         h.request("http://example.com/1")
         h.request("http://example.com/2")
         out = set()
@@ -105,6 +107,7 @@ class InitTest(TestCase):
     async def test_skip_results_that_fail(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
         h.heuristics.add(BlockRequest("http://example.com/1"))
+        h.collect_successful_requests()
         h.request("http://example.com/1")
         h.request("http://example.com/2")
 
@@ -119,11 +122,12 @@ class InitTest(TestCase):
     @async_test()
     async def test_successful_requests_return_if_no_pending_requests(self, loop):
         h = HammerTime(loop=loop, request_engine=FakeEngine())
+        h.collect_successful_requests()
 
         try:
             with async_timeout.timeout(0.001):
                 async for entry in h.successful_requests():
-                    pass
+                    entry.request
         except asyncio.TimeoutError:
             self.fail("Function blocked.")
 
@@ -189,6 +193,7 @@ class InitTest(TestCase):
         engine = MagicMock()
         engine.perform = make_mocked_coro(raise_exception=asyncio.CancelledError)
         hammertime = HammerTime(loop=loop, request_engine=engine)
+        hammertime.collect_successful_requests()
 
         for i in range(5):
             hammertime.request("http://example.com")
