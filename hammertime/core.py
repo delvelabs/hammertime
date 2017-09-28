@@ -84,11 +84,12 @@ class HammerTime:
             self.stats.completed += 1
 
     def collect_successful_requests(self):
-        assert self._success_iterator is None, "Can only be called once."
+        assert self._success_iterator is None, "collect_successful_requests() can only be called once."
         self._success_iterator = QueueIterator(loop=self.loop, has_pending_cb=lambda: len(self.tasks) > 0)
 
     def successful_requests(self):
-        assert self._success_iterator is not None, "You must enable success collection prior to performing requests."
+        assert self._success_iterator is not None, \
+               "You must call collect_successful_requests() prior to performing requests."
         return self._success_iterator
 
     def _on_completion(self, task):

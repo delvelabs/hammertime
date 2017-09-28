@@ -65,7 +65,11 @@ Return an AsyncIterator with the entries of all successful requests. No exceptio
 requests that caused an exception are not returned. Entries are returned as soon as they are available, thus the
 entries are not in the same order as the requests.
 
-Return: An AsyncIterator containing [HTTP entries](#entry) of the successful requests.
+*Since 0.2.0* In order to be functional, *collect_successful_requests* must be called prior to requests being
+performed.
+
+Return: An AsyncIterator containing [HTTP entries](#entry) of the successful requests. Intended to be used with 
+*async for*.
 
 **coroutine close()**
 
