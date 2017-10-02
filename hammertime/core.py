@@ -40,10 +40,10 @@ class HammerTime:
             self.request_engine.set_proxy(proxy)
         self.heuristics = Heuristics(kb=kb, request_engine=self.request_engine)
 
-        self.completed_queue = asyncio.Queue(loop=self.loop)
         self.tasks = deque()
         self.closed = asyncio.Future(loop=loop)
         self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
+        self._success_iterator = None
 
     @property
     def completed_count(self):
@@ -74,7 +74,7 @@ class HammerTime:
         try:
             entry = Entry.create(*args, **kwargs)
             entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
-            await self.completed_queue.put(entry)
+
             return entry
         except (HammerTimeException, asyncio.CancelledError):
             raise
@@ -83,16 +83,24 @@ class HammerTime:
         finally:
             self.stats.completed += 1
 
+    def collect_successful_requests(self):
+        assert self._success_iterator is None, "collect_successful_requests() can only be called once."
+        self._success_iterator = QueueIterator(loop=self.loop, has_pending_cb=lambda: len(self.tasks) > 0)
+
     def successful_requests(self):
-        if len(self.tasks) == 0 and self.completed_queue.qsize() == 0:
-            self.completed_queue.put_nowait(None)
-        return QueueIterator(self.completed_queue)
+        assert self._success_iterator is not None, \
+               "You must call collect_successful_requests() prior to performing requests."
+        return self._success_iterator
 
     def _on_completion(self, task):
         self._drain(task)
         self.tasks.remove(task)
-        if len(self.tasks) == 0:
-            self.completed_queue.put_nowait(None)
+
+        if self._success_iterator:
+            # Checking exception conditions explicitly to avoid using try/except blocks
+            entry = task.result() if not task.cancelled() and not task.exception() else None
+
+            self._success_iterator.complete(entry)
 
     def _drain(self, task):
         try:
@@ -123,8 +131,13 @@ class HammerTime:
 
 class QueueIterator:
 
-    def __init__(self, queue):
-        self.queue = queue
+    def __init__(self, *, loop, has_pending_cb):
+        self.queue = asyncio.Queue(loop=loop)
+        self.has_pending = has_pending_cb
+
+    def complete(self, entry):
+        if entry or not self.has_pending():
+            self.queue.put_nowait(entry)
 
     async def __aiter__(self):
         return self
@@ -134,7 +147,7 @@ class QueueIterator:
             out = None
             if not self.queue.empty():
                 out = self.queue.get_nowait()
-            else:
+            elif self.has_pending():
                 out = await self.queue.get()
 
             if out is None:

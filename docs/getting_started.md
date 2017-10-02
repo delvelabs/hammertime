@@ -28,6 +28,8 @@ reject_5xx = RejectStatusCode(range(500, 600))
 timeout = DynamicTimeout(min_timeout=0.01, max_timeout=1, retries=3)
 hammertime.heuristics.add_multiple([reject_5xx, timeout])
 
+hammertime.collect_successful_requests()
+
 async def fetch():
     for i in range(10000):
         hammertime.request("http://example.com/")
