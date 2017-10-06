@@ -46,6 +46,7 @@ class Result:
     def __init__(self):
         self.attempt = 1
         self.read_length = -1  # -1 is unlimited
+        self.redirects = []
 
     def __hash__(self):
         return hash(self.__dict__)
