@@ -27,10 +27,11 @@ valid_redirects = (301, 302, 303, 307, 308)
 
 class FollowRedirects:
 
-    def __init__(self, *, max_redirect=15):
+    def __init__(self, *, max_redirect=15, stats):
         self.max_redirect = max_redirect
         self.engine = None
         self.child_heuristics = Heuristics()
+        self.stats = stats
 
     def set_engine(self, engine):
         self.engine = engine
@@ -47,11 +48,13 @@ class FollowRedirects:
         while status_code in valid_redirects and redirect_count < self.max_redirect:
             try:
                 location = entry.response.headers["location"]
+                self.stats.requested += 1
                 _entry = await self._perform_request(location)
                 entry.result.redirects.append((_entry.request, _entry.response))
                 self._replace_response(entry, _entry.response)
                 status_code = entry.response.code
                 redirect_count += 1
+                self.stats.completed += 1
             except KeyError:
                 return
 

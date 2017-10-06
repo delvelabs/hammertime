@@ -30,7 +30,7 @@ class TestFollowRedirects(TestCase):
 
     def setUp(self):
         self.engine = FakeEngine()
-        self.rule = FollowRedirects(max_redirect=10)
+        self.rule = FollowRedirects(max_redirect=10, stats=MagicMock(requested=1, completed=0))
         self.rule.set_engine(self.engine)
 
     @async_test()
@@ -102,6 +102,20 @@ class TestFollowRedirects(TestCase):
 
         self.assertEqual(self.engine.mock.call_count, self.rule.max_redirect)
         self.assertEqual(len(entry.result.redirects), self.rule.max_redirect + 1)
+
+    @async_test()
+    async def test_after_headers_increment_stats_for_each_redirect(self):
+        response = Response(status=302, headers={"location": "https://www.example.com/"})
+        response.set_content(b"content", at_eof=True)
+        entry = Entry.create("http://example.com", response=copy(response))
+        final_response = Response(status=200, headers={})
+        final_response.set_content(b"response content", at_eof=True)
+        self.engine.response = final_response
+
+        await self.rule.after_headers(entry)
+
+        self.assertEqual(self.rule.stats.requested, 2)
+        self.assertEqual(self.rule.stats.completed, 1)
 
 
 class FakeEngine:
