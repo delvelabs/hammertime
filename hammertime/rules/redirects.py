@@ -47,9 +47,9 @@ class FollowRedirects:
         redirect_count = 0
         while status_code in valid_redirects and redirect_count < self.max_redirect:
             try:
-                location = entry.response.headers["location"]
+                url = entry.response.headers["location"]
                 self.stats.requested += 1
-                _entry = await self._perform_request(location)
+                _entry = await self._perform_request(url)
                 entry.result.redirects.append((_entry.request, _entry.response))
                 self._replace_response(entry, _entry.response)
                 status_code = entry.response.code
@@ -58,11 +58,9 @@ class FollowRedirects:
             except KeyError:
                 return
 
-    async def _perform_request(self, location):
-        entry = Entry.create(location)
+    async def _perform_request(self, url):
+        entry = Entry.create(url)
         return await self.engine.perform_high_priority(entry, self.child_heuristics)
 
     def _replace_response(self, entry, response):
-        entry.response.code = response.code
-        entry.response.headers = response.headers
-        entry.response.set_content(response.raw, at_eof=not response.truncated)
+        entry.response.__dict__ = response.__dict__

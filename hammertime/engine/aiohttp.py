@@ -138,6 +138,3 @@ class Response:
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
-
-    def __repr__(self):
-        return "Response(%s location:%s)" % (self.code, self.headers["location"] if "location" in self.headers else "")
