@@ -122,6 +122,8 @@ An entry contains the following attribute:
 * result:  
     * attempt: The amount of time this request was sent.
     * read_length: The length (in bytes) of the response body that will be read (default is -1, i.e. unlimited).
+    * redirects: A list of tuples containing request/response pairs generated when a redirect is followed. Empty list if
+                 no redirect.
 * response:  
     * code: The HTTP status code of the response
     * headers = The HTTP headers of the response.

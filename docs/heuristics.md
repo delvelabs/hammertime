@@ -101,3 +101,15 @@ Parameters:
 
 * name: The name of the field in the HTTP header.
 * value: The value for the field.
+
+
+**class hammertime.rules.FollowRedirects(\*, max_redirects=15, stats)**
+
+Follow redirects and store all the intermediate HTTP entries in the [result](reference.md) of the initial entry. The 
+complete path between the initial request and the final (non-redirect) response can be retrieved from 
+entry.result.redirects, redirects is a list of tuple containing a request and its response:
+```python
+entry = await hammertime.request("http://example.com/")
+for request, response in entry.result.redirects:
+    pass
+```
