@@ -19,24 +19,26 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 from fixtures import async_test
+from statistics import stdev, mean
 
 from hammertime.rules import DynamicTimeout
 from hammertime.http import Entry
 from hammertime.kb import KnowledgeBase
-from statistics import stdev, mean
 
 
 class DynamicTimeoutTest(TestCase):
 
     def setUp(self):
-        self.retries = 3
         self.max_timeout = 10
         self.min_timeout = 0.2
         self.sample_size = 100
-        self.rule = DynamicTimeout(min_timeout=self.min_timeout, max_timeout=self.max_timeout, retries=self.retries,
+        self.rule = DynamicTimeout(min_timeout=self.min_timeout, max_timeout=self.max_timeout,
                                    sample_size=self.sample_size)
         self.knowledge_base = KnowledgeBase()
         self.rule.set_kb(self.knowledge_base)
+        self.retry_engine = MagicMock()
+        self.retry_engine.retry_count = 3
+        self.rule.set_engine(self.retry_engine)
         self.entry_factory = lambda: Entry.create("http://example.com")
 
     @async_test()
@@ -109,12 +111,22 @@ class DynamicTimeoutTest(TestCase):
     @async_test()
     async def test_before_request_use_max_timeout_if_last_attempt(self):
         entry = self.entry_factory()
-        entry.result.attempt = self.retries + 1
+        entry.result.attempt = self.retry_engine.retry_count + 1
         entry.arguments["timeout"] = 1
 
         await self.rule.before_request(entry)
 
         self.assertEqual(entry.arguments["timeout"], self.max_timeout)
+
+    @async_test()
+    async def test_before_request_dont_use_max_timeout_if_first_attempt_and_no_retry(self):
+        self.rule.retry_count = 0
+        entry = self.entry_factory()
+        entry.arguments["timeout"] = 1
+
+        await self.rule.before_request(entry)
+
+        self.assertNotEqual(entry.arguments["timeout"], self.max_timeout)
 
     @async_test()
     async def test_after_headers_add_request_time_to_knowledge_base(self):
