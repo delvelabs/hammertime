@@ -36,7 +36,7 @@ class FollowRedirects:
     def set_engine(self, engine):
         self.engine = engine
 
-    async def after_headers(self, entry):
+    async def on_request_successful(self, entry):
         status_code = entry.response.code
         if status_code in valid_redirects:
             entry.result.redirects.append((entry.request, copy.copy(entry.response)))
@@ -60,7 +60,7 @@ class FollowRedirects:
 
     async def _perform_request(self, url):
         entry = Entry.create(url)
-        return await self.engine.perform_high_priority(entry, self.child_heuristics)
+        return await self.engine.perform(entry, self.child_heuristics)
 
     def _replace_response(self, entry, response):
         entry.response.__dict__ = response.__dict__

@@ -39,84 +39,84 @@ class TestFollowRedirects(TestCase):
         self.entry = Entry.create("http://example.com", response=self.response)
 
     @async_test()
-    async def test_after_headers_ignore_response_if_not_redirect(self):
+    async def test_on_request_successful_ignore_response_if_not_redirect(self):
         response = MagicMock(code=200, headers={})
         entry = Entry.create("http://example.com", response=response)
 
-        await self.rule.after_headers(entry)
+        await self.rule.on_request_successful(entry)
 
         self.engine.mock.assert_not_called()
 
     @async_test()
-    async def test_after_headers_perform_new_request_for_redirect(self):
+    async def test_on_request_successful_perform_new_request_for_redirect(self):
         final_response = MagicMock(code=200, headers={})
         self.engine.response = final_response
 
-        await self.rule.after_headers(self.entry)
+        await self.rule.on_request_successful(self.entry)
 
         self.engine.mock.assert_called_once_with(Entry.create("https://www.example.com/"), self.rule.child_heuristics)
 
     @async_test()
-    async def test_after_headers_keep_initial_request(self):
+    async def test_on_request_successful_keep_initial_request(self):
         initial_request = self.entry.request
         final_response = MagicMock(code=200, headers={})
         self.engine.response = final_response
 
-        await self.rule.after_headers(self.entry)
+        await self.rule.on_request_successful(self.entry)
 
         self.assertEqual(self.entry.request, initial_request)
 
     @async_test()
-    async def test_after_headers_set_final_response_as_entry_response(self):
+    async def test_on_request_successful_set_final_response_as_entry_response(self):
         final_response = Response(status=200, headers={})
         final_response.set_content(b"data", at_eof=True)
         self.engine.response = final_response
 
-        await self.rule.after_headers(self.entry)
+        await self.rule.on_request_successful(self.entry)
 
         self.assertEqual(self.entry.response, final_response)
 
     @async_test()
-    async def test_after_headers_store_intermediate_requests_and_responses_in_result(self):
+    async def test_on_request_successful_store_intermediate_requests_and_responses_in_result(self):
         response = copy(self.response)
         final_response = Response(status=200, headers={})
         final_response.set_content(b"response content", at_eof=True)
         self.engine.response = final_response
 
-        await self.rule.after_headers(self.entry)
+        await self.rule.on_request_successful(self.entry)
 
         self.assertEqual(self.entry.result.redirects, [(self.entry.request, response),
                                                        (Request("https://www.example.com/"), final_response)])
 
     @async_test()
-    async def test_after_headers_dont_follow_redirect_if_max_redirect_limit_reached(self):
+    async def test_on_request_successful_dont_follow_redirect_if_max_redirect_limit_reached(self):
         self.engine.response = Response(status=302, headers={"location": "http://example.com/"})
         self.engine.response.set_content(b"data", at_eof=True)
 
-        await self.rule.after_headers(self.entry)
+        await self.rule.on_request_successful(self.entry)
 
         self.assertEqual(self.engine.mock.call_count, self.rule.max_redirect)
         self.assertEqual(len(self.entry.result.redirects), self.rule.max_redirect + 1)
 
     @async_test()
-    async def test_after_headers_increment_stats_for_each_redirect(self):
+    async def test_on_request_successful_increment_stats_for_each_redirect(self):
         final_response = Response(status=200, headers={})
         final_response.set_content(b"response content", at_eof=True)
         self.engine.response = final_response
 
-        await self.rule.after_headers(self.entry)
+        await self.rule.on_request_successful(self.entry)
 
         self.assertEqual(self.rule.stats.requested, 2)
         self.assertEqual(self.rule.stats.completed, 1)
 
     @async_test()
-    async def test_after_headers_raise_exception_if_redirect_fail(self):
+    async def test_on_request_successful_raise_exception_if_redirect_fail(self):
         engine = MagicMock()
-        engine.perform_high_priority = make_mocked_coro(raise_exception=StopRequest())
+        engine.perform = make_mocked_coro(raise_exception=StopRequest())
         self.rule.set_engine(engine)
 
         with self.assertRaises(StopRequest):
-            await self.rule.after_headers(self.entry)
+            await self.rule.on_request_successful(self.entry)
 
 
 class FakeEngine:
@@ -125,7 +125,7 @@ class FakeEngine:
         self.response = None
         self.mock = MagicMock()
 
-    async def perform_high_priority(self, entry, heuristics=None):
+    async def perform(self, entry, heuristics=None):
         self.mock(entry, heuristics)
         if self.response is not None:
             return entry._replace(response=self.response)

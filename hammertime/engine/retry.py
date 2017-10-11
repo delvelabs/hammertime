@@ -42,18 +42,19 @@ class RetryEngine(Engine):
         return await self._perform(self.priority_limiter, entry, heuristics or self.default_heuristics())
 
     async def _perform(self, limiter, entry, heuristics):
-        async with limiter:
-            while True:
-                try:
+        while True:
+            try:
+                async with limiter:
                     entry = await self.request_engine.perform(entry, heuristics=heuristics)
-                    return entry
-                except StopRequest:
-                    if entry.result.attempt > self.retry_count:
-                        raise
-                    else:
-                        entry.result.attempt += 1
-                        self.stats.retries += 1
-                        entry = entry._replace(response=None)
+                await heuristics.on_request_successful(entry)
+                return entry
+            except StopRequest:
+                if entry.result.attempt > self.retry_count:
+                    raise
+                else:
+                    entry.result.attempt += 1
+                    self.stats.retries += 1
+                    entry = entry._replace(response=None)
 
     async def close(self):
         if self.request_engine is not None:
