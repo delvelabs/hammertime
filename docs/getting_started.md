@@ -25,7 +25,7 @@ hammertime = HammerTime(retry_count=3)  # Retries for failed request (default is
 
 #To add multiple heuristics:
 reject_5xx = RejectStatusCode(range(500, 600))
-timeout = DynamicTimeout(min_timeout=0.01, max_timeout=1, retries=3)
+timeout = DynamicTimeout(min_timeout=0.01, max_timeout=1)
 hammertime.heuristics.add_multiple([reject_5xx, timeout])
 
 hammertime.collect_successful_requests()

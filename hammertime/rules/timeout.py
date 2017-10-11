@@ -22,14 +22,17 @@ from statistics import mean, stdev
 
 class DynamicTimeout:
 
-    def __init__(self, min_timeout, max_timeout, retries, sample_size=200):
+    def __init__(self, min_timeout, max_timeout, sample_size=200):
         self.min_timeout = min_timeout
         self.max_timeout = max_timeout
         self.timeout_manager = TimeoutManager(min_timeout, max_timeout, sample_size)
-        self.retries = retries
+        self.retry_count = 0
 
     def set_kb(self, kb):
         kb.timeout_manager = self.timeout_manager
+
+    def set_engine(self, engine):
+        self.retry_count = engine.retry_count
 
     async def before_request(self, entry):
         if self._is_last_attempt(entry):
@@ -45,7 +48,7 @@ class DynamicTimeout:
         self.timeout_manager.add_failed_request(entry)
 
     def _is_last_attempt(self, entry):
-        return entry.result.attempt > self.retries
+        return entry.result.attempt > self.retry_count if self.retry_count != 0 else False
 
 
 class TimeoutManager:
