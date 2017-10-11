@@ -19,7 +19,7 @@ from hammertime import HammerTime
 
 hammertime = HammerTime(retry_count=3)
 reject_5xx = RejectStatusCode(range(500, 600))
-dynamic_timeout = DynamicTimeout(0.01, 2, 3)
+dynamic_timeout = DynamicTimeout(0.01, 2)
 heuristics = [reject_5xx, dynamic_timeout]
 hammertime.heuristics.add_multiple(heuristics)
 ```
@@ -55,7 +55,7 @@ Parameters:
 
 * initial_limit: The initial size limit for the response body. Default is 1 MB.
 
-**class hammertime.rules.DynamicTimeout(min_timeout, max_timeout, retries, sample_size=200)**
+**class hammertime.rules.DynamicTimeout(min_timeout, max_timeout, sample_size=200)**
     
 Dynamically adjust the request timeout based on real-time average latency to maximise performance.
   
@@ -63,7 +63,6 @@ Parameters:
 
 * min_timeout: Minimum value for the request timeout, in seconds.
 * max_timeout: Maximum value for the request timeout, in seconds.
-* retries: The amount of retries for a failed request.
 * sample_size: the amount of requests used to calculate the timeout. for example, if the sample size is 100, the last 
                100 requests will be used to calculate the timeout. Default is 200.
 
@@ -87,7 +86,7 @@ from hammertime import HammerTime
 from hammertime.rules import DetectSoft404, DynamicTimeout
   
 hammertime = HammerTime(retry_count=3)
-timeout = DynamicTimeout(0.05, 2, 3)
+timeout = DynamicTimeout(0.05, 2)
 soft_404_detection = DetectSoft404()
 soft_404_detection.child_heuristics.add(timeout)
 hammertime.heuristics.add_multiple((timeout, soft_404_detection))
