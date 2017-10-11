@@ -15,14 +15,21 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from collections import namedtuple
 
+class Entry:
 
-Entry = namedtuple('Entry', ['request', 'response', 'result', 'arguments'])
-Entry.create = lambda *args, response=None, arguments=None, **kwargs: Entry(request=Request(*args, **kwargs),
-                                                                            response=response,
-                                                                            result=Result(),
-                                                                            arguments=arguments or {})
+    def __init__(self, request, response, result, arguments):
+        self.request = request
+        self.response = response
+        self.result = result
+        self.arguments = arguments
+
+    @staticmethod
+    def create(*args, response=None, arguments=None, **kwargs):
+        return Entry(request=Request(*args, **kwargs), response=response, result=Result(), arguments=arguments or {})
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
 
 
 class Request:

@@ -54,7 +54,8 @@ class TestFollowRedirects(TestCase):
 
         await self.rule.on_request_successful(self.entry)
 
-        self.engine.mock.assert_called_once_with(Entry.create("https://www.example.com/"), self.rule.child_heuristics)
+        self.engine.mock.assert_called_once_with(Entry.create("https://www.example.com/", response=final_response),
+                                                 self.rule.child_heuristics)
 
     @async_test()
     async def test_on_request_successful_keep_initial_request(self):
@@ -129,5 +130,5 @@ class FakeEngine:
     async def perform(self, entry, heuristics=None):
         self.mock(entry, heuristics)
         if self.response is not None:
-            return entry._replace(response=self.response)
+            entry.response = self.response
         return entry

@@ -54,7 +54,7 @@ class RetryEngine(Engine):
                 else:
                     entry.result.attempt += 1
                     self.stats.retries += 1
-                    entry = entry._replace(response=None)
+                    entry.response = None
 
     async def close(self):
         if self.request_engine is not None:

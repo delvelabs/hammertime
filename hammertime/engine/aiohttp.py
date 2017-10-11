@@ -73,8 +73,7 @@ class AioHttpEngine:
 
         # When the request is simply rejected, we want to keep the persistent connection alive
         async with ProtectedSession(response, RejectRequest):
-            resp = Response(response.status, response.headers)
-            entry = entry._replace(response=resp)
+            entry.response = Response(response.status, response.headers)
 
             await heuristics.after_headers(entry)
 

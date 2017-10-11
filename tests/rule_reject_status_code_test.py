@@ -74,9 +74,9 @@ class DetectSoft404Test(TestCase):
 
     @async_test()
     async def test_call_made_to_alternate_url_for_request_url_pattern(self):
-        response = StaticResponse(200, {}, content="content")
-        self.engine.mock.perform_high_priority.side_effect = lambda entry, heuristics: entry._replace(response=response)
         module_path = "hammertime.rules.status.string"
+        response = StaticResponse(200, {}, content="content")
+        self.engine.response = response
         with patch(module_path + ".ascii_uppercase", "A"), patch(module_path + ".ascii_lowercase", "a"), \
              patch(module_path + ".digits", "1"), \
              patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
@@ -91,14 +91,14 @@ class DetectSoft404Test(TestCase):
             await self.rule.after_response(self.create_entry("http://example.com/TEST/test.gif"))
 
             self.engine.mock.perform_high_priority.assert_has_calls([
-                call(Entry.create("http://example.com/a"), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/a/"), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/.a"), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/1/a.html"), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/A/1.a.js"), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/a/A.json"), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/1/a.png"), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/A/a.gif"), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/a", response=response), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/a/", response=response), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/.a", response=response), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/1/a.html", response=response), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/A/1.a.js", response=response), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/a/A.json", response=response), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/1/a.png", response=response), self.rule.child_heuristics),
+                call(Entry.create("http://example.com/A/a.gif", response=response), self.rule.child_heuristics),
             ])
 
     @async_test()
@@ -125,7 +125,7 @@ class DetectSoft404Test(TestCase):
     async def test_add_alternate_url_response_to_knowledge_base(self):
         response = StaticResponse(200, {})
         response.content = "response content"
-        self.engine.mock.perform_high_priority = lambda entry, heuristics: entry._replace(response=response)
+        self.engine.response = response
 
         await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
         await self.rule.after_response(self.create_entry("http://example.com/123/", response_content="response"))
@@ -151,7 +151,7 @@ class DetectSoft404Test(TestCase):
     async def test_add_hash_of_raw_content_if_response_content_is_not_text(self):
         response = Response(200, {})
         response.set_content(b'x\x80Z"\x1a\x98\x8ey\xef?B\xd7\xc5\xbf\xd4\x18', True)
-        self.engine.mock.perform_high_priority.return_value = Entry.create("url", response=response)
+        self.engine.response = response
         await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
@@ -292,9 +292,12 @@ class FakeEngine(Engine):
 
     def __init__(self):
         self.mock = MagicMock()
+        self.response = None
 
     async def perform(self, entry, heuristics):
         return self.mock.perform(entry, heuristics)
 
     async def perform_high_priority(self, entry, heuristics):
-        return self.mock.perform_high_priority(entry, heuristics)
+        entry.response = self.response or StaticResponse(200, {}, content="content")
+        self.mock.perform_high_priority(entry, heuristics)
+        return entry
