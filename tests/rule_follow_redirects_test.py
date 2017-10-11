@@ -32,7 +32,7 @@ class TestFollowRedirects(TestCase):
 
     def setUp(self):
         self.engine = FakeEngine()
-        self.rule = FollowRedirects(max_redirect=10, stats=MagicMock(requested=1, completed=0))
+        self.rule = FollowRedirects(max_redirect=10)
         self.rule.set_engine(self.engine)
         self.response = Response(status=302, headers={"location": "https://www.example.com/"})
         self.response.set_content(b"", at_eof=True)
@@ -106,8 +106,8 @@ class TestFollowRedirects(TestCase):
 
         await self.rule.on_request_successful(self.entry)
 
-        self.assertEqual(self.rule.stats.requested, 2)
-        self.assertEqual(self.rule.stats.completed, 1)
+        self.assertEqual(self.engine.stats.requested, 2)
+        self.assertEqual(self.engine.stats.completed, 1)
 
     @async_test()
     async def test_on_request_successful_raise_exception_if_redirect_fail(self):
@@ -124,6 +124,7 @@ class FakeEngine:
     def __init__(self):
         self.response = None
         self.mock = MagicMock()
+        self.stats = MagicMock(requested=1, completed=0)
 
     async def perform(self, entry, heuristics=None):
         self.mock(entry, heuristics)
