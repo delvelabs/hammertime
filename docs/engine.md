@@ -69,7 +69,7 @@ Parameters:
 **coroutine hammertime.engine.AioHttpEngine.perform(entry, heuristics)**
 
 Send a HTTP request and apply heuristics to the request. Redirects are not followed, the 3xx response is returned. To
-follow redirects, uses the [FollowRedirects](heuristics.md) heuristic.
+follow redirects, use the [FollowRedirects](heuristics.md) heuristic.
 
 Parameters:
 
