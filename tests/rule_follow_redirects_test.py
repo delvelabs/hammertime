@@ -86,8 +86,9 @@ class TestFollowRedirects(TestCase):
 
         await self.rule.on_request_successful(self.entry)
 
-        expected = [Entry.create(self.entry.request.url, response=response),
-                    Entry.create("https://www.example.com/", response=final_response)]
+        expected = [Entry.create(self.entry.request.url, method=self.entry.request.method,
+                                 headers=self.entry.request.headers, response=response),
+                    Entry.create("https://www.example.com/", method='GET', headers={}, response=final_response)]
         self.assertEqual(self.entry.result.redirects, expected)
 
     @async_test()
