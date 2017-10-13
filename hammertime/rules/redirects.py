@@ -16,6 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+from copy import copy
+
 from hammertime.http import Entry
 from hammertime.ruleset import Heuristics, RejectRequest
 
@@ -36,10 +38,7 @@ class FollowRedirects:
     async def on_request_successful(self, entry):
         status_code = entry.response.code
         if status_code in valid_redirects:
-            _entry = Entry.create(entry.request.url, method=entry.request.method, headers=entry.request.headers,
-                                  response=entry.response)
-            _entry.result.attempt = entry.result.attempt
-            entry.result.redirects.append(_entry)
+            entry.result.redirects.append(copy(entry))
             await self._follow_redirects(entry)
 
     async def _follow_redirects(self, entry):

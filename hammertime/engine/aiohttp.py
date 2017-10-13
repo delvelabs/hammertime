@@ -137,3 +137,8 @@ class Response:
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def __copy__(self):
+        response = Response(self.code, self.headers)
+        response.set_content(self.raw, not self.truncated)
+        return response
