@@ -229,7 +229,7 @@ class FakeEngine(Engine):
 
     async def perform(self, entry, heuristics):
         await heuristics.before_request(entry)
-        entry = entry._replace(response=StaticResponse(200, {"Content-Type": "text/junk"}))
+        entry.response = StaticResponse(200, {"Content-Type": "text/junk"})
         await heuristics.after_headers(entry)
         entry.response.content = entry.request.url
         await heuristics.after_response(entry)

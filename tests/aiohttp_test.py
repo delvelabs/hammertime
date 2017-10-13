@@ -39,7 +39,8 @@ class TestAioHttpEngine(TestCase):
         await engine.perform(entry, Heuristics())
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
-                                                       timeout=0.2, proxy="http://some.proxy.com/")
+                                                       timeout=0.2, proxy="http://some.proxy.com/",
+                                                       allow_redirects=False)
 
     @async_test()
     async def test_set_proxy(self, loop):
@@ -74,7 +75,8 @@ class TestAioHttpEngine(TestCase):
         await engine.perform(entry, Heuristics())
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
-                                                       timeout=10, proxy="http://some.proxy.com/")
+                                                       timeout=10, proxy="http://some.proxy.com/",
+                                                       allow_redirects=False)
 
     @async_test()
     async def test_specify_header(self, loop):
@@ -86,7 +88,7 @@ class TestAioHttpEngine(TestCase):
         await engine.perform(entry, Heuristics())
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
-                                                       timeout=ANY,
+                                                       timeout=ANY, allow_redirects=False,
                                                        headers={"User-Agent": "Hammertime 1.2.3"})
 
 

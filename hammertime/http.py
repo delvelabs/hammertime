@@ -15,14 +15,28 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from collections import namedtuple
+
+from copy import copy
 
 
-Entry = namedtuple('Entry', ['request', 'response', 'result', 'arguments'])
-Entry.create = lambda *args, response=None, arguments=None, **kwargs: Entry(request=Request(*args, **kwargs),
-                                                                            response=response,
-                                                                            result=Result(),
-                                                                            arguments=arguments or {})
+class Entry:
+
+    def __init__(self, request, response, result, arguments):
+        self.request = request
+        self.response = response
+        self.result = result
+        self.arguments = arguments
+
+    @staticmethod
+    def create(*args, response=None, arguments=None, **kwargs):
+        return Entry(request=Request(*args, **kwargs), response=response, result=Result(), arguments=arguments or {})
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __copy__(self):
+        return Entry(request=copy(self.request), response=copy(self.response), result=copy(self.result),
+                     arguments=copy(self.arguments))
 
 
 class Request:
@@ -41,17 +55,31 @@ class Request:
     def __repr__(self):
         return "Request(%s %s)" % (self.method, self.url)
 
+    def __copy__(self):
+        return Request(self.url, method=self.method, headers=copy(self.headers))
+
 
 class Result:
     def __init__(self):
         self.attempt = 1
         self.read_length = -1  # -1 is unlimited
+        self.redirects = []
 
     def __hash__(self):
         return hash(self.__dict__)
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def __copy__(self):
+        _copy = Result()
+        _copy.attempt = self.attempt
+        _copy.read_length = self.read_length
+        _copy.redirects = copy(self.redirects)
+        return _copy
+
+    def __repr__(self):
+        return repr(self.__dict__)
 
 
 class StaticResponse:
@@ -69,3 +97,6 @@ class StaticResponse:
     @raw.setter
     def raw(self, value):
         self.content = value.decode('utf-8')
+
+    def __copy__(self):
+        return StaticResponse(self.code, copy(self.headers), content=self.content)

@@ -117,23 +117,83 @@ The amount of completed requests divided by the current duration.
 
 ## Entry
 
-An entry contains the following attribute:
+**class hammertime.http.Entry(request, response, result, arguments)**
 
-* request:  
-    * url: URL of the request
-    * method: HTTP method of the request ('GET' by default).
-    * headers: A dict with the name/value of the fields in the HTTP header.
-* result:  
-    * attempt: The amount of time this request was sent.
-    * read_length: The length (in bytes) of the response body that will be read (default is -1, i.e. unlimited).
-* response:  
-    * code: The HTTP status code of the response
-    * headers = The HTTP headers of the response.
-    * content: The content of the response in a string.
-    * raw: The content of the response in bytes.
-    * truncated: True if the response content was truncated because the length exceed the max read length.
+Create a new Entry without default values. Use static method *create* to create a new Entry with default values.
+
+Parameters:
+
+* request: The request of the entry.
+* result: The result of the entry.
+* response: The response of the entry.
 * arguments: A dictionary used to store optional arguments with the entry.
 
-**function hammertime.http.Entry.create(\*args, response=None, arguments=None, \*\*kwargs)**
+**static method create(\*args, response=None, arguments=None, \*\*kwargs)**
 
-Creates a new HTTP entry. args and kwargs are used to create the request. Return a namedtuple.
+Create a new Entry.
+
+Parameters:
+
+* args: Arguments used to create the Request (the URL of the request).
+* response: The response for the Entry. Default is None.
+* arguments: A dictionary used to store optional arguments with the entry.
+* kwargs: Keywords arguments used to create the Request.
+
+Return: The created Entry.
+
+**attribute request**  
+An instance of the Request class, containing the HTTP request of the entry.
+    
+**attribute result**  
+An instance of the Result class, containing data about the result of the HTTP request.
+
+**attribute response**  
+An instance of the Response class, containing the HTTP response of the entry.
+
+**attribute arguments**  
+A dictionary used to store optional arguments with the entry.
+
+
+**class hammertime.http.Request(url, \*, method='GET', headers=None)**
+A class containing all the information used to make the HTTP request.
+
+**attribute url**
+The URL for the request.
+
+**attribute method**
+The method for the HTTP request. Only 'GET' is available for now.
+
+**attribute headers**
+A dict with the name/value of the fields in the HTTP header.
+
+
+**class hammertime.http.Result()**
+A class containing various data about the result of the HTTP request.
+
+**attribute attempt**
+The amount of time the request was sent.
+
+**attribute read_length**
+The maximum length (in bytes) of the response body that will be read (default is -1, i.e. unlimited).
+
+**attribute redirects**
+A list of HTTP entries generated when a redirect is followed. Empty list if no redirect.
+
+
+**class hammertime.http.StaticResponse(code, headers, content=None)**
+A class containing the response for the HTTP request.
+
+**attribute code**
+The HTTP status code of the response.
+
+**attribute headers**
+The HTTP headers of the response.
+
+**attribute content**
+The content of the response as a string.
+
+**attribute truncated**
+True if the response content is truncated because the length exceed the max read length.
+
+**property raw**
+The content of the response in UTF-8 encoded bytes. This is a read/write property.

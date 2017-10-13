@@ -50,14 +50,15 @@ Avoid time-consuming operations in heuristics methods, as it can affect the requ
 
 ## Knowledge base
 
-Heuristics sometimes need a way to collect data about received responses or sent requests and store it to act upon it 
-for future requests. The knowledge base allows heuristics to store an object containing data where they can store all 
-the data they collect. If your heuristic needs to use the knowledge base, define a method called set_kb in the 
-heuristic. A knowledge base object is passed to this method when the heuristic is added to HammerTime, and you add your 
-object where you store your data to it. Ex: 
+The knowledge base is an object used by heuristics to store all kind of data about received responses or sent requests, 
+allowing dynamic decision making. For example, DynamicTimeout heuristic stores the round-trip time of all requests 
+when it receives the response to adjust the timeout dynamically. To use the knowledge base, define a method called 
+set_kb in the heuristic. A knowledge base object is passed to this method when the heuristic is added to HammerTime. In
+this method, simply assign the object that your heuristic uses to store data as an attribute of the knowledge base:
 ```python
 def set_kb(self, kb):
     kb.status_codes = self.status_codes
 ```
+Assignment to already initialized attribute of the knowledge base will raise an AttributeError.
 Objects added to the knowledge base need to be serializable, as the knowledge base can be store to a file to be shared 
 between several HammerTime executions.

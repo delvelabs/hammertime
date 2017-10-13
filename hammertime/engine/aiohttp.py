@@ -68,13 +68,12 @@ class AioHttpEngine:
             if entry.request.headers:
                 extra_args["headers"] = entry.request.headers
 
-            response = await self.session.request(method=req.method, url=req.url,
+            response = await self.session.request(method=req.method, url=req.url, allow_redirects=False,
                                                   timeout=timeout_value, **extra_args)
 
         # When the request is simply rejected, we want to keep the persistent connection alive
         async with ProtectedSession(response, RejectRequest):
-            resp = Response(response.status, response.headers)
-            entry = entry._replace(response=resp)
+            entry.response = Response(response.status, response.headers)
 
             await heuristics.after_headers(entry)
 
@@ -135,3 +134,11 @@ class Response:
             raise ValueError("Content is only partially read")
 
         return self.raw.decode('utf-8')
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __copy__(self):
+        response = Response(self.code, self.headers)
+        response.set_content(self.raw, not self.truncated)
+        return response
