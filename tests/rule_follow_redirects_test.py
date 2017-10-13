@@ -78,7 +78,7 @@ class TestFollowRedirects(TestCase):
         self.assertEqual(self.entry.response, final_response)
 
     @async_test()
-    async def test_on_request_successful_store_intermediate_requests_and_responses_in_result(self):
+    async def test_on_request_successful_store_intermediate_entry_in_result(self):
         response = copy(self.response)
         final_response = Response(status=200, headers={})
         final_response.set_content(b"response content", at_eof=True)
@@ -86,8 +86,9 @@ class TestFollowRedirects(TestCase):
 
         await self.rule.on_request_successful(self.entry)
 
-        self.assertEqual(self.entry.result.redirects, [(self.entry.request, response),
-                                                       (Request("https://www.example.com/"), final_response)])
+        expected = [Entry.create(self.entry.request.url, response=response),
+                    Entry.create("https://www.example.com/", response=final_response)]
+        self.assertEqual(self.entry.result.redirects, expected)
 
     @async_test()
     async def test_on_request_successful_raise_reject_request_if_max_redirect_limit_reached(self):

@@ -36,7 +36,9 @@ class FollowRedirects:
     async def on_request_successful(self, entry):
         status_code = entry.response.code
         if status_code in valid_redirects:
-            entry.result.redirects.append((entry.request, entry.response))
+            _entry = Entry.create(entry.request.url, response=entry.response)
+            _entry.result.attempt = entry.result.attempt
+            entry.result.redirects.append(_entry)
             await self._follow_redirects(entry)
 
     async def _follow_redirects(self, entry):
@@ -48,7 +50,7 @@ class FollowRedirects:
             try:
                 url = entry.response.headers["location"]
                 _entry = await self._perform_request(url)
-                entry.result.redirects.append((_entry.request, _entry.response))
+                entry.result.redirects.append(_entry)
                 entry.response = _entry.response
                 status_code = entry.response.code
                 redirect_count += 1
