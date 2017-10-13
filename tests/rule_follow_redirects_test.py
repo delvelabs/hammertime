@@ -25,7 +25,7 @@ from hammertime.rules import FollowRedirects
 from fixtures import async_test
 from hammertime.http import Entry, Request
 from hammertime.engine.aiohttp import Response
-from hammertime.ruleset import StopRequest
+from hammertime.ruleset import StopRequest, RejectRequest
 
 
 class TestFollowRedirects(TestCase):
@@ -90,14 +90,15 @@ class TestFollowRedirects(TestCase):
                                                        (Request("https://www.example.com/"), final_response)])
 
     @async_test()
-    async def test_on_request_successful_dont_follow_redirect_if_max_redirect_limit_reached(self):
+    async def test_on_request_successful_raise_reject_request_if_max_redirect_limit_reached(self):
         self.engine.response = Response(status=302, headers={"location": "http://example.com/"})
         self.engine.response.set_content(b"data", at_eof=True)
 
-        await self.rule.on_request_successful(self.entry)
+        with self.assertRaises(RejectRequest):
+            await self.rule.on_request_successful(self.entry)
 
-        self.assertEqual(self.engine.mock.call_count, self.rule.max_redirect)
-        self.assertEqual(len(self.entry.result.redirects), self.rule.max_redirect + 1)
+            self.assertEqual(self.engine.mock.call_count, self.rule.max_redirect)
+            self.assertEqual(len(self.entry.result.redirects), self.rule.max_redirect + 1)
 
     @async_test()
     async def test_on_request_successful_increment_stats_for_each_redirect(self):
@@ -109,6 +110,14 @@ class TestFollowRedirects(TestCase):
 
         self.assertEqual(self.engine.stats.requested, 2)
         self.assertEqual(self.engine.stats.completed, 1)
+
+    @async_test()
+    async def test_on_request_successful_reject_request_if_no_location_in_response_header(self):
+        self.engine.response = Response(status=302, headers={})
+        self.engine.response.set_content(b"data", at_eof=True)
+
+        with self.assertRaises(RejectRequest):
+            await self.rule.on_request_successful(self.entry)
 
     @async_test()
     async def test_on_request_successful_raise_exception_if_redirect_fail(self):

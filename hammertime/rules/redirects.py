@@ -17,7 +17,7 @@
 
 
 from hammertime.http import Entry
-from hammertime.ruleset import Heuristics
+from hammertime.ruleset import Heuristics, RejectRequest
 
 
 valid_redirects = (301, 302, 303, 307, 308)
@@ -42,7 +42,9 @@ class FollowRedirects:
     async def _follow_redirects(self, entry):
         status_code = entry.response.code
         redirect_count = 0
-        while status_code in valid_redirects and redirect_count < self.max_redirect:
+        while status_code in valid_redirects:
+            if redirect_count > self.max_redirect:
+                raise RejectRequest("Max redirect limit reached")
             try:
                 url = entry.response.headers["location"]
                 _entry = await self._perform_request(url)
@@ -51,7 +53,7 @@ class FollowRedirects:
                 status_code = entry.response.code
                 redirect_count += 1
             except KeyError:
-                return
+                raise RejectRequest("Missing location field in header of redirect")
 
     async def _perform_request(self, url):
         entry = Entry.create(url)
