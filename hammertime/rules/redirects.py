@@ -17,6 +17,7 @@
 
 
 from copy import copy
+from urllib.parse import urljoin
 
 from hammertime.http import Entry
 from hammertime.ruleset import Heuristics, RejectRequest
@@ -49,7 +50,8 @@ class FollowRedirects:
                 raise RejectRequest("Max redirect limit reached")
             try:
                 url = entry.response.headers["location"]
-                _entry = await self._perform_request(url)
+                last_url = entry.result.redirects[-1].request.url
+                _entry = await self._perform_request(url, base_url=last_url)
                 entry.result.redirects.append(_entry)
                 entry.response = _entry.response
                 status_code = entry.response.code
@@ -57,8 +59,8 @@ class FollowRedirects:
             except KeyError:
                 raise RejectRequest("Missing location field in header of redirect")
 
-    async def _perform_request(self, url):
-        entry = Entry.create(url)
+    async def _perform_request(self, url, base_url):
+        entry = Entry.create(urljoin(base_url, url))
         self.engine.stats.requested += 1
         entry = await self.engine.perform(entry, self.child_heuristics)
         self.engine.stats.completed += 1

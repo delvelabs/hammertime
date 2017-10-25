@@ -90,6 +90,10 @@ class StaticResponse:
         self.content = content
         self.truncated = False
 
+    def set_content(self, data, at_eof):
+        self.raw = data
+        self.truncated = not at_eof
+
     @property
     def raw(self):
         return self.content.encode('utf-8')
@@ -97,6 +101,9 @@ class StaticResponse:
     @raw.setter
     def raw(self, value):
         self.content = value.decode('utf-8')
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
 
     def __copy__(self):
         return StaticResponse(self.code, copy(self.headers), content=self.content)

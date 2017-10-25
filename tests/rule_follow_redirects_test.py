@@ -23,8 +23,7 @@ from aiohttp.test_utils import make_mocked_coro
 
 from hammertime.rules import FollowRedirects
 from fixtures import async_test
-from hammertime.http import Entry, Request
-from hammertime.engine.aiohttp import Response
+from hammertime.http import Entry, StaticResponse as Response
 from hammertime.ruleset import StopRequest, RejectRequest
 
 
@@ -34,7 +33,7 @@ class TestFollowRedirects(TestCase):
         self.engine = FakeEngine()
         self.rule = FollowRedirects(max_redirect=10)
         self.rule.set_engine(self.engine)
-        self.response = Response(status=302, headers={"location": "https://www.example.com/"})
+        self.response = Response(code=302, headers={"location": "https://www.example.com/"})
         self.response.set_content(b"", at_eof=True)
         self.entry = Entry.create("http://example.com", response=self.response)
 
@@ -69,7 +68,7 @@ class TestFollowRedirects(TestCase):
 
     @async_test()
     async def test_on_request_successful_set_final_response_as_entry_response(self):
-        final_response = Response(status=200, headers={})
+        final_response = Response(code=200, headers={})
         final_response.set_content(b"data", at_eof=True)
         self.engine.response = final_response
 
@@ -80,7 +79,7 @@ class TestFollowRedirects(TestCase):
     @async_test()
     async def test_on_request_successful_store_intermediate_entry_in_result(self):
         response = copy(self.response)
-        final_response = Response(status=200, headers={})
+        final_response = Response(code=200, headers={})
         final_response.set_content(b"response content", at_eof=True)
         self.engine.response = final_response
 
@@ -93,7 +92,7 @@ class TestFollowRedirects(TestCase):
 
     @async_test()
     async def test_on_request_successful_raise_reject_request_if_max_redirect_limit_reached(self):
-        self.engine.response = Response(status=302, headers={"location": "http://example.com/"})
+        self.engine.response = Response(code=302, headers={"location": "http://example.com/"})
         self.engine.response.set_content(b"data", at_eof=True)
 
         with self.assertRaises(RejectRequest):
@@ -104,7 +103,7 @@ class TestFollowRedirects(TestCase):
 
     @async_test()
     async def test_on_request_successful_increment_stats_for_each_redirect(self):
-        final_response = Response(status=200, headers={})
+        final_response = Response(code=200, headers={})
         final_response.set_content(b"response content", at_eof=True)
         self.engine.response = final_response
 
@@ -115,11 +114,62 @@ class TestFollowRedirects(TestCase):
 
     @async_test()
     async def test_on_request_successful_reject_request_if_no_location_in_response_header(self):
-        self.engine.response = Response(status=302, headers={})
+        self.engine.response = Response(code=302, headers={})
         self.engine.response.set_content(b"data", at_eof=True)
 
         with self.assertRaises(RejectRequest):
             await self.rule.on_request_successful(self.entry)
+
+    @async_test()
+    async def test_relative_path_in_location(self):
+        self.engine.mock.side_effect = [
+            Response(code=302, headers={"location": "splash/index.html"}),
+            Response(code=201, headers={}),
+        ]
+
+        await self.rule.on_request_successful(self.entry)
+
+        self.assertEqual(201, self.entry.response.code)
+        self.assertEqual("https://www.example.com/splash/index.html", self.entry.result.redirects[-1].request.url)
+
+    @async_test()
+    async def test_relative_path_with_mutliple_redirects(self):
+        self.engine.mock.side_effect = [
+            Response(code=302, headers={"location": "splash/index.html"}),
+            Response(code=302, headers={"location": "index.php"}),
+            Response(code=201, headers={}),
+        ]
+
+        await self.rule.on_request_successful(self.entry)
+
+        self.assertEqual(201, self.entry.response.code)
+        self.assertEqual("https://www.example.com/splash/index.php", self.entry.result.redirects[-1].request.url)
+
+    @async_test()
+    async def test_path_absolute(self):
+        self.engine.mock.side_effect = [
+            Response(code=302, headers={"location": "splash/index.html"}),
+            Response(code=302, headers={"location": "/index.php"}),
+            Response(code=201, headers={}),
+        ]
+
+        await self.rule.on_request_successful(self.entry)
+
+        self.assertEqual(201, self.entry.response.code)
+        self.assertEqual("https://www.example.com/index.php", self.entry.result.redirects[-1].request.url)
+
+    @async_test()
+    async def test_full_different_domain(self):
+        self.engine.mock.side_effect = [
+            Response(code=302, headers={"location": "http://example.org/splash/index.html"}),
+            Response(code=302, headers={"location": "test"}),
+            Response(code=201, headers={}),
+        ]
+
+        await self.rule.on_request_successful(self.entry)
+
+        self.assertEqual(201, self.entry.response.code)
+        self.assertEqual("http://example.org/splash/test", self.entry.result.redirects[-1].request.url)
 
     @async_test()
     async def test_on_request_successful_raise_exception_if_redirect_fail(self):
@@ -139,7 +189,7 @@ class FakeEngine:
         self.stats = MagicMock(requested=1, completed=0)
 
     async def perform(self, entry, heuristics=None):
-        self.mock(entry, heuristics)
+        entry.response = self.mock(entry, heuristics)
         if self.response is not None:
             entry.response = self.response
         return entry
