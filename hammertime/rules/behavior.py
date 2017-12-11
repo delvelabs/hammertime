@@ -24,15 +24,18 @@ class DetectBehaviorChange:
     def __init__(self, buffer_size=5):
         self.response_buffer = []
         self.max_buffer_size = buffer_size
+        self.error_behavior = False
 
     def set_kb(self, kb):
         kb.behavior_buffer = self.response_buffer
 
     async def after_response(self, entry):
-        self.response_buffer.append(entry.response.content)
         if len(self.response_buffer) >= self.max_buffer_size:
-            if self._test_behavior(entry.response.content):
-                raise BehaviorChanged()
+            self.error_behavior = self._test_behavior(entry.response.content)
+            self.response_buffer.pop(0)
+        self.response_buffer.append(entry.response.content)
+        if self.error_behavior:
+            raise BehaviorChanged()
 
     def _test_behavior(self, content):
         return all(self._hash(_content).distance(self._hash(content)) < 5 for _content in self.response_buffer)

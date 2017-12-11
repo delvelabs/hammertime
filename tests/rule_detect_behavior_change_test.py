@@ -39,11 +39,19 @@ class TestDetectBehaviorChange(TestCase):
         self.assertEqual(kb.behavior_buffer, [entry.response.content])
 
     @async_test()
+    async def test_after_response_pop_first_response_content_if_buffer_is_full(self):
+        entry = Entry.create("http://example.com/", response=StaticResponse(200, {}, content="data"))
+        behavior_detection = DetectBehaviorChange(buffer_size=5)
+        behavior_detection.response_buffer = ["1", "2", "3", "4", "5"]
+
+        await behavior_detection.after_response(entry)
+
+        self.assertEqual(behavior_detection.response_buffer, ["2", "3", "4", "5", "data"])
+
+    @async_test()
     async def test_after_response_test_behavior_if_behavior_buffer_is_full(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_buffer = ["data"] * 10
-        kb = KnowledgeBase()
-        behavior_detection.set_kb(kb)
         behavior_detection._test_behavior = MagicMock(return_value=False)
         response = StaticResponse(200, {}, content="test")
         entry = Entry.create("http://example.com/", response=response)
@@ -56,8 +64,6 @@ class TestDetectBehaviorChange(TestCase):
     async def test_after_response_dont_test_behavior_if_behavior_buffer_not_full(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_buffer = ["data"] * 5
-        kb = KnowledgeBase()
-        behavior_detection.set_kb(kb)
         behavior_detection._test_behavior = MagicMock(return_value=False)
         response = StaticResponse(200, {}, content="test")
         entry = Entry.create("http://example.com/", response=response)
@@ -67,13 +73,38 @@ class TestDetectBehaviorChange(TestCase):
         behavior_detection._test_behavior.assert_not_called()
 
     @async_test()
-    async def test_after_response_raise_exception_if_behavior_changed(self):
+    async def test_after_response_raise_exception_if_behavior_is_not_normal(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_buffer = ["data"] * 10
-        kb = KnowledgeBase()
-        behavior_detection.set_kb(kb)
         response = StaticResponse(200, {}, content="data")
         entry = Entry.create("http://example.com/", response=response)
 
         with self.assertRaises(BehaviorChanged):
             await behavior_detection.after_response(entry)
+        self.assertTrue(behavior_detection.error_behavior)
+
+    @async_test()
+    async def test_after_response_dont_raise_exception_if_normal_behavior_restored(self):
+        behavior_detection = DetectBehaviorChange(buffer_size=10)
+        behavior_detection.response_buffer = ["data"] * 10
+        behavior_detection.error_behavior = True
+        response = StaticResponse(200, {}, content="test")
+        entry = Entry.create("http://example.com/", response=response)
+
+        await behavior_detection.after_response(entry)
+
+        self.assertFalse(behavior_detection.error_behavior)
+
+    @async_test()
+    async def test_behavior_return_true_if_all_response_have_the_same_content(self):
+        behavior_detection = DetectBehaviorChange(buffer_size=10)
+        behavior_detection.response_buffer = ["data"] * 10
+
+        self.assertTrue(behavior_detection._test_behavior("data"))
+
+    @async_test()
+    async def test_behavior_return_false_if_not_all_response_have_the_same_content(self):
+        behavior_detection = DetectBehaviorChange(buffer_size=10)
+        behavior_detection.response_buffer = ["data"] * 10
+
+        self.assertFalse(behavior_detection._test_behavior("test"))
