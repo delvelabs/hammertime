@@ -28,19 +28,6 @@ from hammertime.rules.behavior import BehaviorChanged
 class TestDetectBehaviorChange(TestCase):
 
     @async_test()
-    async def test_after_response_increment_behavior_chances_of_entry(self):
-        entry0 = Entry.create("http://example.com/", response=MagicMock())
-        entry1 = Entry.create("http://example.com/", response=MagicMock())
-        behavior_detection = DetectBehaviorChange()
-
-        await behavior_detection.after_response(entry0)
-        await behavior_detection.after_response(entry1)
-        await behavior_detection.after_response(entry1)
-
-        self.assertEqual(entry0.arguments['behavior_chances'], 1)
-        self.assertEqual(entry1.arguments['behavior_chances'], 2)
-
-    @async_test()
     async def test_after_response_store_response_content_in_knowledge_base(self):
         entry = Entry.create("http://example.com/", response=StaticResponse(200, {}, content="data"))
         behavior_detection = DetectBehaviorChange()
@@ -52,14 +39,14 @@ class TestDetectBehaviorChange(TestCase):
         self.assertEqual(kb.behavior_buffer, [entry.response.content])
 
     @async_test()
-    async def test_after_response_test_behavior_if_behavior_buffer_full_and_max_behavior_chances_reached(self):
-        behavior_detection = DetectBehaviorChange(buffer_size=10, behavior_chances=5)
+    async def test_after_response_test_behavior_if_behavior_buffer_is_full(self):
+        behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_buffer = ["data"] * 10
         kb = KnowledgeBase()
         behavior_detection.set_kb(kb)
         behavior_detection._test_behavior = MagicMock(return_value=False)
         response = StaticResponse(200, {}, content="test")
-        entry = Entry.create("http://example.com/", response=response, arguments={"behavior_chances": 5})
+        entry = Entry.create("http://example.com/", response=response)
 
         await behavior_detection.after_response(entry)
 
@@ -67,27 +54,13 @@ class TestDetectBehaviorChange(TestCase):
 
     @async_test()
     async def test_after_response_dont_test_behavior_if_behavior_buffer_not_full(self):
-        behavior_detection = DetectBehaviorChange(buffer_size=10, behavior_chances=5)
+        behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_buffer = ["data"] * 5
         kb = KnowledgeBase()
         behavior_detection.set_kb(kb)
         behavior_detection._test_behavior = MagicMock(return_value=False)
         response = StaticResponse(200, {}, content="test")
-        entry = Entry.create("http://example.com/", response=response, arguments={"behavior_chances": 5})
-
-        await behavior_detection.after_response(entry)
-
-        behavior_detection._test_behavior.assert_not_called()
-
-    @async_test()
-    async def test_after_response_dont_test_behavior_if_entry_still_has_chances(self):
-        behavior_detection = DetectBehaviorChange(buffer_size=10, behavior_chances=5)
-        behavior_detection.response_buffer = ["data"] * 10
-        kb = KnowledgeBase()
-        behavior_detection.set_kb(kb)
-        behavior_detection._test_behavior = MagicMock(return_value=False)
-        response = StaticResponse(200, {}, content="test")
-        entry = Entry.create("http://example.com/", response=response, arguments={"behavior_chances": 3})
+        entry = Entry.create("http://example.com/", response=response)
 
         await behavior_detection.after_response(entry)
 
@@ -95,12 +68,12 @@ class TestDetectBehaviorChange(TestCase):
 
     @async_test()
     async def test_after_response_raise_exception_if_behavior_changed(self):
-        behavior_detection = DetectBehaviorChange(buffer_size=10, behavior_chances=5)
+        behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_buffer = ["data"] * 10
         kb = KnowledgeBase()
         behavior_detection.set_kb(kb)
         response = StaticResponse(200, {}, content="data")
-        entry = Entry.create("http://example.com/", response=response, arguments={"behavior_chances": 5})
+        entry = Entry.create("http://example.com/", response=response)
 
         with self.assertRaises(BehaviorChanged):
             await behavior_detection.after_response(entry)

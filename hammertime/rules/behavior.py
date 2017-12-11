@@ -21,21 +21,16 @@ from hammertime.rules.simhash import Simhash
 
 class DetectBehaviorChange:
 
-    def __init__(self, buffer_size=5, behavior_chances=5):
+    def __init__(self, buffer_size=5):
         self.response_buffer = []
         self.max_buffer_size = buffer_size
-        self.max_behavior_chances = behavior_chances
 
     def set_kb(self, kb):
         kb.behavior_buffer = self.response_buffer
 
     async def after_response(self, entry):
-        if 'behavior_chances' in entry.arguments:
-            entry.arguments['behavior_chances'] += 1
-        else:
-            entry.arguments['behavior_chances'] = 1
         self.response_buffer.append(entry.response.content)
-        if entry.arguments['behavior_chances'] >= self.max_behavior_chances and len(self.response_buffer) >= self.max_buffer_size:
+        if len(self.response_buffer) >= self.max_buffer_size:
             if self._test_behavior(entry.response.content):
                 raise BehaviorChanged()
 
