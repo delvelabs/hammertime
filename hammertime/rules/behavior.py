@@ -22,26 +22,31 @@ from hammertime.rules.simhash import Simhash
 class DetectBehaviorChange:
 
     def __init__(self, buffer_size=5):
-        self.response_buffer = []
+        self.response_simhash_buffer = []
         self.max_buffer_size = buffer_size
         self.error_behavior = False
 
     def set_kb(self, kb):
-        kb.behavior_buffer = self.response_buffer
+        kb.behavior_buffer = self.response_simhash_buffer
 
     async def after_response(self, entry):
-        if len(self.response_buffer) >= self.max_buffer_size:
-            self.error_behavior = self._test_behavior(entry.response.content)
-            self.response_buffer.pop(0)
-        self.response_buffer.append(entry.response.content)
+        if len(self.response_simhash_buffer) >= self.max_buffer_size:
+            self.error_behavior = self._test_behavior(entry)
+            self.response_simhash_buffer.pop(0)
+        self.response_simhash_buffer.append(self._hash(self._read_content(entry.response)).value)
         if self.error_behavior:
             raise BehaviorChanged()
 
-    def _test_behavior(self, content):
-        return all(self._hash(_content).distance(self._hash(content)) < 5 for _content in self.response_buffer)
+    def _test_behavior(self, entry):
+        content = self._read_content(entry.response)
+        content_simhash = self._hash(content)
+        return all(self._hash(simhash_value).distance(content_simhash) < 5 for simhash_value in self.response_simhash_buffer)
 
     def _hash(self, content):
         return Simhash(content)
+
+    def _read_content(self, response):
+        return response.raw.decode('utf-8', errors='ignore')
 
 
 class BehaviorChanged(HammerTimeException):
