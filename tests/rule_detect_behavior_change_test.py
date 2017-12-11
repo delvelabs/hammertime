@@ -53,25 +53,25 @@ class TestDetectBehaviorChange(TestCase):
     async def test_after_response_test_behavior_if_behavior_buffer_is_full(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_simhash_buffer = ["data"] * 10
-        behavior_detection._test_behavior = MagicMock(return_value=False)
+        behavior_detection._is_error_behavior = MagicMock(return_value=False)
         response = StaticResponse(200, {}, content="test")
         entry = Entry.create("http://example.com/", response=response)
 
         await behavior_detection.after_response(entry)
 
-        behavior_detection._test_behavior.assert_called_once_with(entry)
+        behavior_detection._is_error_behavior.assert_called_once_with(entry)
 
     @async_test()
     async def test_after_response_dont_test_behavior_if_behavior_buffer_not_full(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_simhash_buffer = ["data"] * 5
-        behavior_detection._test_behavior = MagicMock(return_value=False)
+        behavior_detection._is_error_behavior = MagicMock(return_value=False)
         response = StaticResponse(200, {}, content="test")
         entry = Entry.create("http://example.com/", response=response)
 
         await behavior_detection.after_response(entry)
 
-        behavior_detection._test_behavior.assert_not_called()
+        behavior_detection._is_error_behavior.assert_not_called()
 
     @async_test()
     async def test_after_response_raise_exception_if_behavior_is_not_normal(self):
@@ -97,19 +97,19 @@ class TestDetectBehaviorChange(TestCase):
         self.assertFalse(behavior_detection.error_behavior)
 
     @async_test()
-    async def test_behavior_return_true_if_all_response_have_the_same_content(self):
+    async def test_is_error_behavior_return_true_if_all_response_have_the_same_content(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_simhash_buffer = [Simhash("data").value] * 10
         response = StaticResponse(200, {}, content="data")
         entry = Entry.create("http://example.com/", response=response)
 
-        self.assertTrue(behavior_detection._test_behavior(entry))
+        self.assertTrue(behavior_detection._is_error_behavior(entry))
 
     @async_test()
-    async def test_behavior_return_false_if_not_all_response_have_the_same_content(self):
+    async def test_is_error_behavior_return_false_if_not_all_response_have_the_same_content(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_simhash_buffer = [Simhash("data").value] * 10
         response = StaticResponse(200, {}, content="test")
         entry = Entry.create("http://example.com/", response=response)
 
-        self.assertFalse(behavior_detection._test_behavior(entry))
+        self.assertFalse(behavior_detection._is_error_behavior(entry))
