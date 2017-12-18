@@ -122,6 +122,6 @@ responses and flag the entries as an error behavior when a lot of identical or v
 To test if a request is an error behavior:
 ```python
 entry = await hammertime.request("http://example.com/")
-if entry.arguments["error_behavior"]:
+if getattr(entry.result, "error_behavior", False):
     # Response is not the normal behavior.
 ```
