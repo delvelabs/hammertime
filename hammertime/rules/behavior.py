@@ -15,14 +15,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from hammertime.ruleset import HammerTimeException
+from hammertime.ruleset import RejectRequest
 from hammertime.rules.simhash import Simhash, DEFAULT_FILTER
 
 
 class DetectBehaviorChange:
 
     def __init__(self, buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, token_size=4):
-        self.response_simhash_buffer = []
+        self.previous_responses = []
         self.max_buffer_size = buffer_size
         self.error_behavior = False
         self.match_threshold = match_threshold
@@ -30,19 +30,19 @@ class DetectBehaviorChange:
         self.token_size = token_size
 
     def set_kb(self, kb):
-        kb.behavior_buffer = self.response_simhash_buffer
+        kb.behavior_buffer = self.previous_responses
 
     async def after_response(self, entry):
-        if len(self.response_simhash_buffer) >= self.max_buffer_size:
+        if len(self.previous_responses) >= self.max_buffer_size:
             self.error_behavior = self._is_error_behavior(entry)
-            self.response_simhash_buffer.pop(0)
-        self.response_simhash_buffer.append(self._hash(self._read_content(entry.response)).value)
-        entry.arguments["error_behavior"] = self.error_behavior
+            self.previous_responses.pop(0)
+        self.previous_responses.append(self._hash(self._read_content(entry.response)).value)
+        entry.result.error_behavior = self.error_behavior
 
     def _is_error_behavior(self, entry):
         content = self._read_content(entry.response)
         content_simhash = self._hash(content)
-        return all(self._compare_simhash(self._hash(value), content_simhash) for value in self.response_simhash_buffer)
+        return all(self._responses_match(content_simhash))
 
     def _hash(self, content):
         return Simhash(content, filter=self.match_filter, token_size=self.token_size)
@@ -50,8 +50,10 @@ class DetectBehaviorChange:
     def _read_content(self, response):
         return response.raw.decode('utf-8', errors='ignore')
 
-    def _compare_simhash(self, simhash0, simhash1):
-        return simhash0.distance(simhash1) < self.match_threshold
+    def _responses_match(self, resp_simhash):
+        for simhash_value in self.previous_responses:
+            simhash = Simhash(simhash_value)
+            yield resp_simhash.distance(simhash) < self.match_threshold
 
 
 class RejectErrorBehavior:
@@ -65,11 +67,11 @@ class RejectErrorBehavior:
     async def after_response(self, entry):
         await self.behavior_change_detection.after_response(entry)
         try:
-            if entry.arguments["error_behavior"]:
+            if entry.result.error_behavior:
                 raise BehaviorError()
         except KeyError:
             pass
 
 
-class BehaviorError(HammerTimeException):
+class BehaviorError(RejectRequest):
     pass

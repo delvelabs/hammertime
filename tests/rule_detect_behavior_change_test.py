@@ -42,11 +42,11 @@ class TestDetectBehaviorChange(TestCase):
 
     @async_test()
     async def test_after_response_pop_first_result_when_buffer_is_full(self):
-        self.kb.behavior_buffer.extend([str(i) for i in range(10)])
+        self.kb.behavior_buffer.extend([i for i in range(10)])
 
         await self.behavior_detection.after_response(self.entry)
 
-        self.assertEqual(self.kb.behavior_buffer, ["1", "2", "3", "4", "5", "6", "7", "8", "9", Simhash("data").value])
+        self.assertEqual(self.kb.behavior_buffer, [1, 2, 3, 4, 5, 6, 7, 8, 9, Simhash("data").value])
 
     @async_test()
     async def test_after_response_test_behavior_if_behavior_buffer_is_full(self):
@@ -67,27 +67,27 @@ class TestDetectBehaviorChange(TestCase):
         self.behavior_detection._is_error_behavior.assert_not_called()
 
     @async_test()
-    async def test_after_response_set_flag_in_entry_arguments_if_behavior_is_not_normal(self):
+    async def test_after_response_set_flag_in_entry_result_if_behavior_is_not_normal(self):
         self.kb.behavior_buffer.extend(["data"] * 10)
 
         await self.behavior_detection.after_response(self.entry)
 
-        self.assertTrue(self.entry.arguments["error_behavior"])
+        self.assertTrue(self.entry.result.error_behavior)
         self.assertTrue(self.behavior_detection.error_behavior)
 
     @async_test()
-    async def test_after_response_dont_set_flag_in_entry_arguments_if_normal_behavior_restored(self):
+    async def test_after_response_dont_set_flag_in_entry_result_if_normal_behavior_restored(self):
         self.kb.behavior_buffer.extend(["test"] * 10)
         self.behavior_detection.error_behavior = True
 
         await self.behavior_detection.after_response(self.entry)
 
-        self.assertFalse(self.entry.arguments["error_behavior"])
+        self.assertFalse(self.entry.result.error_behavior)
         self.assertFalse(self.behavior_detection.error_behavior)
 
     @async_test()
     async def test_is_error_behavior_return_true_if_all_response_have_the_same_content(self):
-        self.behavior_detection.response_simhash_buffer = [Simhash("data").value] * 10
+        self.behavior_detection.previous_responses = [Simhash("data").value] * 10
 
         error_behavior = self.behavior_detection._is_error_behavior(self.entry)
 
@@ -95,7 +95,7 @@ class TestDetectBehaviorChange(TestCase):
 
     @async_test()
     async def test_is_error_behavior_return_false_if_not_all_response_have_the_same_content(self):
-        self.behavior_detection.response_simhash_buffer = [Simhash("data").value] * 10
+        self.behavior_detection.previous_responses = [Simhash("data").value] * 10
         response = StaticResponse(200, {}, content="test")
         entry = Entry.create("http://example.com/", response=response)
 
@@ -124,7 +124,8 @@ class TestRejectErrorBehavior(TestCase):
     async def test_after_response_raise_exception_if_behavior_changed(self, loop):
         self.heuristic.behavior_change_detection.after_response.return_value = fake_future(None, loop)
         response = StaticResponse(200, {}, content="test")
-        entry = Entry.create("http://example.com/", response=response, arguments={"error_behavior": True})
+        entry = Entry.create("http://example.com/", response=response)
+        entry.result.error_behavior = True
 
         with self.assertRaises(BehaviorError):
             await self.heuristic.after_response(entry)
