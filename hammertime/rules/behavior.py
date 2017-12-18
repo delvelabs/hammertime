@@ -54,7 +54,7 @@ class DetectBehaviorChange:
         return simhash0.distance(simhash1) < self.match_threshold
 
 
-class RejectBehaviorChange:
+class RejectErrorBehavior:
 
     def __init__(self, **kwargs):
         self.behavior_change_detection = DetectBehaviorChange(**kwargs)
@@ -66,10 +66,10 @@ class RejectBehaviorChange:
         await self.behavior_change_detection.after_response(entry)
         try:
             if entry.arguments["error_behavior"]:
-                raise BehaviorChanged()
+                raise BehaviorError()
         except KeyError:
             pass
 
 
-class BehaviorChanged(HammerTimeException):
+class BehaviorError(HammerTimeException):
     pass

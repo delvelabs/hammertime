@@ -20,9 +20,9 @@ from unittest.mock import MagicMock
 
 from fixtures import async_test, fake_future
 from hammertime.http import Entry, StaticResponse
-from hammertime.rules import DetectBehaviorChange, RejectBehaviorChange
+from hammertime.rules import DetectBehaviorChange, RejectErrorBehavior
 from hammertime.kb import KnowledgeBase
-from hammertime.rules.behavior import BehaviorChanged
+from hammertime.rules.behavior import BehaviorError
 from hammertime.rules.simhash import Simhash
 
 
@@ -104,10 +104,10 @@ class TestDetectBehaviorChange(TestCase):
         self.assertFalse(error_behavior)
 
 
-class TestRejectBehaviorChange(TestCase):
+class TestRejectErrorBehavior(TestCase):
 
     def setUp(self):
-        self.heuristic = RejectBehaviorChange()
+        self.heuristic = RejectErrorBehavior()
         self.heuristic.behavior_change_detection = MagicMock()
         response = StaticResponse(200, {}, content="test")
         self.entry = Entry.create("http://example.com/", response=response)
@@ -126,5 +126,5 @@ class TestRejectBehaviorChange(TestCase):
         response = StaticResponse(200, {}, content="test")
         entry = Entry.create("http://example.com/", response=response, arguments={"error_behavior": True})
 
-        with self.assertRaises(BehaviorChanged):
+        with self.assertRaises(BehaviorError):
             await self.heuristic.after_response(entry)
