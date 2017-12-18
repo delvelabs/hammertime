@@ -112,3 +112,16 @@ entry = await hammertime.request("http://example.com/")
 for entry in entry.result.redirects:
     pass
 ```
+
+
+**class hammertime.rules.DetectBehaviorChange(buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, 
+                                              token_size=4)**
+
+This heuristic catches the server's behavior change, such as a WAF starting to block all requests. It compares the 
+responses and flag the entries as an error behavior when a lot of identical or very similar responses are received.
+To test if a request is an error behavior:
+```python
+entry = await hammertime.request("http://example.com/")
+if entry.arguments["error_behavior"]:
+    # Response is not the normal behavior.
+```
