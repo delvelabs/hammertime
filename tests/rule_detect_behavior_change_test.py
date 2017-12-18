@@ -74,7 +74,7 @@ class TestDetectBehaviorChange(TestCase):
         behavior_detection._is_error_behavior.assert_not_called()
 
     @async_test()
-    async def test_after_response_flag_entry_if_behavior_is_not_normal(self):
+    async def test_after_response_set_flag_in_entry_arguments_if_behavior_is_not_normal(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_simhash_buffer = ["data"] * 10
         response = StaticResponse(200, {}, content="data")
@@ -86,7 +86,7 @@ class TestDetectBehaviorChange(TestCase):
         self.assertTrue(behavior_detection.error_behavior)
 
     @async_test()
-    async def test_after_response_dont_raise_exception_if_normal_behavior_restored(self):
+    async def test_after_response_dont_set_flag_in_entry_arguments_if_normal_behavior_restored(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_simhash_buffer = ["data"] * 10
         behavior_detection.error_behavior = True
@@ -95,6 +95,7 @@ class TestDetectBehaviorChange(TestCase):
 
         await behavior_detection.after_response(entry)
 
+        self.assertFalse(entry.arguments["error_behavior"])
         self.assertFalse(behavior_detection.error_behavior)
 
     @async_test()
