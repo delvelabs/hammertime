@@ -18,9 +18,9 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from fixtures import async_test
+from fixtures import async_test, fake_future
 from hammertime.http import Entry, StaticResponse
-from hammertime.rules import DetectBehaviorChange
+from hammertime.rules import DetectBehaviorChange, RejectBehaviorChange
 from hammertime.kb import KnowledgeBase
 from hammertime.rules.behavior import BehaviorChanged
 from hammertime.rules.simhash import Simhash
@@ -74,14 +74,15 @@ class TestDetectBehaviorChange(TestCase):
         behavior_detection._is_error_behavior.assert_not_called()
 
     @async_test()
-    async def test_after_response_raise_exception_if_behavior_is_not_normal(self):
+    async def test_after_response_flag_entry_if_behavior_is_not_normal(self):
         behavior_detection = DetectBehaviorChange(buffer_size=10)
         behavior_detection.response_simhash_buffer = ["data"] * 10
         response = StaticResponse(200, {}, content="data")
         entry = Entry.create("http://example.com/", response=response)
 
-        with self.assertRaises(BehaviorChanged):
-            await behavior_detection.after_response(entry)
+        await behavior_detection.after_response(entry)
+
+        self.assertTrue(entry.arguments["error_behavior"])
         self.assertTrue(behavior_detection.error_behavior)
 
     @async_test()
@@ -113,3 +114,29 @@ class TestDetectBehaviorChange(TestCase):
         entry = Entry.create("http://example.com/", response=response)
 
         self.assertFalse(behavior_detection._is_error_behavior(entry))
+
+
+class TestRejectBehaviorChange(TestCase):
+
+    @async_test()
+    async def test_after_response_check_for_behavior_change(self, loop):
+        heuristic = RejectBehaviorChange()
+        heuristic.behavior_change_detection = MagicMock()
+        heuristic.behavior_change_detection.after_response.return_value = fake_future(None, loop)
+        response = StaticResponse(200, {}, content="test")
+        entry = Entry.create("http://example.com/", response=response)
+
+        await heuristic.after_response(entry)
+
+        heuristic.behavior_change_detection.after_response.assert_called_once_with(entry)
+
+    @async_test()
+    async def test_after_response_raise_exception_if_behavior_changed(self, loop):
+        heuristic = RejectBehaviorChange()
+        heuristic.behavior_change_detection = MagicMock()
+        heuristic.behavior_change_detection.after_response.return_value = fake_future(None, loop)
+        response = StaticResponse(200, {}, content="test")
+        entry = Entry.create("http://example.com/", response=response, arguments={"error_behavior": True})
+
+        with self.assertRaises(BehaviorChanged):
+            await heuristic.after_response(entry)

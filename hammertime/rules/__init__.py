@@ -20,7 +20,7 @@ from .header import SetHeader
 from .status import RejectStatusCode, DetectSoft404
 from .timeout import DynamicTimeout
 from .redirects import FollowRedirects
-from .behavior import DetectBehaviorChange
+from .behavior import DetectBehaviorChange, RejectBehaviorChange
 
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     DynamicTimeout,
     FollowRedirects,
     IgnoreLargeBody,
+    RejectBehaviorChange,
     RejectStatusCode,
     SetHeader,
 ]

@@ -37,8 +37,7 @@ class DetectBehaviorChange:
             self.error_behavior = self._is_error_behavior(entry)
             self.response_simhash_buffer.pop(0)
         self.response_simhash_buffer.append(self._hash(self._read_content(entry.response)).value)
-        if self.error_behavior:
-            raise BehaviorChanged()
+        entry.arguments["error_behavior"] = self.error_behavior
 
     def _is_error_behavior(self, entry):
         content = self._read_content(entry.response)
@@ -53,6 +52,23 @@ class DetectBehaviorChange:
 
     def _compare_simhash(self, simhash0, simhash1):
         return simhash0.distance(simhash1) < self.match_threshold
+
+
+class RejectBehaviorChange:
+
+    def __init__(self, **kwargs):
+        self.behavior_change_detection = DetectBehaviorChange(**kwargs)
+
+    def set_kb(self, kb):
+        self.behavior_change_detection.set_kb(kb)
+
+    async def after_response(self, entry):
+        await self.behavior_change_detection.after_response(entry)
+        try:
+            if entry.arguments["error_behavior"]:
+                raise BehaviorChanged()
+        except KeyError:
+            pass
 
 
 class BehaviorChanged(HammerTimeException):
