@@ -92,25 +92,20 @@ class TestRejectErrorBehavior(TestCase):
 
     def setUp(self):
         self.heuristic = RejectErrorBehavior()
-        self.heuristic.behavior_change_detection = MagicMock()
-        response = StaticResponse(200, {}, content="test")
-        self.entry = Entry.create("http://example.com/", response=response)
+        self.entry = Entry.create("http://example.com/")
 
     @async_test()
-    async def test_after_response_check_for_behavior_change(self, loop):
-        self.heuristic.behavior_change_detection.after_response.return_value = fake_future(None, loop)
+    async def test_after_response_dont_raise_if_no_behavior_error(self):
         self.entry.result.error_behavior = False
 
-        await self.heuristic.after_response(self.entry)
-
-        self.heuristic.behavior_change_detection.after_response.assert_called_once_with(self.entry)
+        try:
+            await self.heuristic.after_response(self.entry)
+        except BehaviorError:
+            self.fail("Request should not be rejected.")
 
     @async_test()
-    async def test_after_response_raise_exception_if_behavior_changed(self, loop):
-        self.heuristic.behavior_change_detection.after_response.return_value = fake_future(None, loop)
-        response = StaticResponse(200, {}, content="test")
-        entry = Entry.create("http://example.com/", response=response)
-        entry.result.error_behavior = True
+    async def test_after_response_raise_exception_if_behavior_changed(self):
+        self.entry.result.error_behavior = True
 
         with self.assertRaises(BehaviorError):
-            await self.heuristic.after_response(entry)
+            await self.heuristic.after_response(self.entry)

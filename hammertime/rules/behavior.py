@@ -58,14 +58,7 @@ class DetectBehaviorChange:
 
 class RejectErrorBehavior:
 
-    def __init__(self, **kwargs):
-        self.behavior_change_detection = DetectBehaviorChange(**kwargs)
-
-    def set_kb(self, kb):
-        self.behavior_change_detection.set_kb(kb)
-
     async def after_response(self, entry):
-        await self.behavior_change_detection.after_response(entry)
         if entry.result.error_behavior:
             raise BehaviorError()
 

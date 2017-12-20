@@ -141,10 +141,8 @@ Parameters:
 * token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
 
 
-**class hammertime.rules.RejectErrorBehavior(\*\*kwargs)**
+**class hammertime.rules.RejectErrorBehavior()**
 
-Same as DetectBehaviorChange, but it also raises a BehaviorError when a request is flagged as an error behavior.
-
-Parameters:
-
-* \*\*kwargs: See DetectBehaviorChange for the valid keyword arguments for this heuristic.
+Reject entries that have the attribute *result.error_behavior* set to True by raising hammertime.behavior.BehaviorError.
+ Must be called after a heuristic that set this attribute, like DetectBehaviorChange. Add the other heuristic before 
+this one when configuring HammerTime's heuristic.
