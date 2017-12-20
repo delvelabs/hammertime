@@ -16,29 +16,34 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+from uuid import uuid4
+import asyncio
+
 from hammertime.ruleset import HammerTimeException
 
 
 class DeadHostDetection:
 
     def __init__(self):
-        self.pending_requests = []
-        self.timeout_requests = []
+        self.pending_requests = {}
+        self.timeout_requests = set()
 
     def set_kb(self, kb):
         kb.pending_requests = self.pending_requests
         kb.timeout_requests = self.timeout_requests
 
     async def before_request(self, entry):
-        self.pending_requests.append(entry.request.url)
+        request_id = uuid4()
+        entry.arguments["uuid"] = request_id
+        self.pending_requests[request_id] = asyncio.Future()
 
     async def after_headers(self, entry):
-        if entry.request.url in self.pending_requests:
-            self.pending_requests.remove(entry.request.url)
+        if entry.arguments["uuid"] in self.pending_requests:
+            self.pending_requests.pop(entry.arguments["uuid"])
 
     async def on_timeout(self, entry):
-        self.timeout_requests.append(entry.request.url)
-        if self.pending_requests == self.timeout_requests:
+        self.timeout_requests.add(entry.arguments["uuid"])
+        if self.pending_requests.keys() == self.timeout_requests:
             raise OfflineHostException()
 
 

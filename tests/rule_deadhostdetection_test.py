@@ -17,9 +17,9 @@
 
 
 from unittest import TestCase
-from unittest.mock import MagicMock
+import asyncio
 
-from fixtures import async_test, fake_future
+from fixtures import async_test
 from hammertime.rules import DeadHostDetection
 from hammertime.kb import KnowledgeBase
 from hammertime.http import Entry
@@ -32,7 +32,7 @@ class TestDeadHostDetection(TestCase):
         pass
 
     @async_test()
-    async def test_before_request_register_request(self):
+    async def test_before_request_register_request_with_uid(self):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
@@ -40,30 +40,41 @@ class TestDeadHostDetection(TestCase):
 
         await detection.before_request(entry)
 
-        self.assertIn("http://example.com/", kb.pending_requests)
+        self.assertIn(entry.arguments["uuid"], kb.pending_requests)
+
+    @async_test()
+    async def test_before_request_set_lock_on_pending_requests(self):
+        detection = DeadHostDetection()
+        kb = KnowledgeBase()
+        detection.set_kb(kb)
+        entry = Entry.create("http://example.com/")
+
+        await detection.before_request(entry)
+
+        self.assertIsInstance(kb.pending_requests[entry.arguments["uuid"]], asyncio.Future)
 
     @async_test()
     async def test_after_headers_remove_pending_request(self):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
-        kb.pending_requests.append("http://example.com/")
-        entry = Entry.create("http://example.com/")
+        entry = Entry.create("http://example.com/", arguments={"uuid": "12345"})
+        kb.pending_requests[entry.arguments["uuid"]] = None
 
         await detection.after_headers(entry)
 
-        self.assertNotIn("http://example.com/", kb.pending_requests)
+        self.assertNotIn(entry.arguments["uuid"], kb.pending_requests)
 
     @async_test()
     async def test_on_timeout_register_failed_request(self):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
-        entry = Entry.create("http://example.com/")
+        entry = Entry.create("http://example.com/", arguments={"uuid": "12345"})
 
         await detection.on_timeout(entry)
 
-        self.assertIn("http://example.com/", kb.timeout_requests)
+        self.assertIn(entry.arguments["uuid"], kb.timeout_requests)
 
     @async_test()
     async def test_on_timeout_raise_offline_host_exception_if_all_requests_timed_out(self):
