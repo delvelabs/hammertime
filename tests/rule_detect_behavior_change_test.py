@@ -52,10 +52,12 @@ class TestDetectBehaviorChange(TestCase):
     async def test_after_response_test_behavior_if_behavior_buffer_is_full(self):
         self.kb.behavior_buffer.extend(["data"] * 10)
         self.behavior_detection._is_error_behavior = MagicMock(return_value=False)
+        simhash = Simhash("value")
+        self.behavior_detection._hash = MagicMock(return_value=simhash)
 
         await self.behavior_detection.after_response(self.entry)
 
-        self.behavior_detection._is_error_behavior.assert_called_once_with(self.entry)
+        self.behavior_detection._is_error_behavior.assert_called_once_with(simhash)
 
     @async_test()
     async def test_after_response_dont_test_behavior_if_behavior_buffer_not_full(self):

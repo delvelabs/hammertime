@@ -33,15 +33,15 @@ class DetectBehaviorChange:
         kb.behavior_buffer = self.previous_responses
 
     async def after_response(self, entry):
+        resp_content = self._read_content(entry.response)
+        content_simhash = self._hash(resp_content)
         if len(self.previous_responses) >= self.max_buffer_size:
-            self.error_behavior = self._is_error_behavior(entry)
+            self.error_behavior = self._is_error_behavior(content_simhash)
             self.previous_responses.pop(0)
-        self.previous_responses.append(self._hash(self._read_content(entry.response)).value)
+        self.previous_responses.append(content_simhash.value)
         entry.result.error_behavior = self.error_behavior
 
-    def _is_error_behavior(self, entry):
-        content = self._read_content(entry.response)
-        content_simhash = self._hash(content)
+    def _is_error_behavior(self, content_simhash):
         return all(self._responses_match(content_simhash))
 
     def _hash(self, content):
