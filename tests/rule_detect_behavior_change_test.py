@@ -87,24 +87,6 @@ class TestDetectBehaviorChange(TestCase):
         self.assertFalse(self.entry.result.error_behavior)
         self.assertFalse(self.behavior_detection.error_behavior)
 
-    @async_test()
-    async def test_is_error_behavior_return_true_if_all_response_have_the_same_content(self):
-        self.behavior_detection.previous_responses = [Simhash("data").value] * 10
-
-        error_behavior = self.behavior_detection._is_error_behavior(self.entry)
-
-        self.assertTrue(error_behavior)
-
-    @async_test()
-    async def test_is_error_behavior_return_false_if_not_all_response_have_the_same_content(self):
-        self.behavior_detection.previous_responses = [Simhash("data").value] * 10
-        response = StaticResponse(200, {}, content="test")
-        entry = Entry.create("http://example.com/", response=response)
-
-        error_behavior = self.behavior_detection._is_error_behavior(entry)
-
-        self.assertFalse(error_behavior)
-
 
 class TestRejectErrorBehavior(TestCase):
 
