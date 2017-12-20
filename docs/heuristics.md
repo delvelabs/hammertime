@@ -122,6 +122,25 @@ responses and flag the entries as an error behavior when a lot of identical or v
 To test if a request is an error behavior:
 ```python
 entry = await hammertime.request("http://example.com/")
-if getattr(entry.result, "error_behavior", False):
+if entry.result.error_behavior:
     # Response is not the normal behavior.
 ```
+
+Parameters:
+
+* buffer_size: The amount of requests to store for behavior comparison. Each response will be compared with the last 
+               *buffer_size* responses. Default is 10.
+* match_threshold: The equality threshold in bit when comparing simhash of responses. Two simhash with *match_threshold*
+                   or more bit that differ will be unequal. Default is 5.
+* match_filter: Regex to filter characters used to compute the simhash of the responses. Default is 
+                r'[\w\u4e00-\u9fcc<>]+'
+* token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
+
+
+**class hammertime.rules.RejectErrorBehavior(\*\*kwargs)**
+
+Same as DetectBehaviorChange, but it also raises a BehaviorError when a request is flagged as an error behavior.
+
+Parameters:
+
+* \*\*kwargs: See DetectBehaviorChange for the valid keyword arguments for this heuristic.
