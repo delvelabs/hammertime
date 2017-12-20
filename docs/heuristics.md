@@ -102,7 +102,7 @@ Parameters:
 * value: The value for the field.
 
 
-**class hammertime.rules.FollowRedirects(\*, max_redirects=15, stats)**
+**class hammertime.rules.FollowRedirects(\*, max_redirects=15)**
 
 Follow redirects and store all the intermediate [HTTP entries](reference.md#entry) in the result of the initial entry. 
 The complete path between the initial request and the final (non-redirect) response can be retrieved from 
@@ -112,6 +112,10 @@ entry = await hammertime.request("http://example.com/")
 for entry in entry.result.redirects:
     pass
 ```
+
+Parameters:
+
+* max_redirects: Maximum redirects the heuristic will follow for a request before rejecting the request. Default is 15.
 
 
 **class hammertime.rules.DetectBehaviorChange(buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, 

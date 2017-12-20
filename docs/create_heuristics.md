@@ -19,6 +19,8 @@ class MyHeuristic:
     async def after_response(self, entry):
     
     async def on_timeout(self, entry):
+    
+    async def on_request_successful(self, entry):
         
 ```
 
@@ -41,6 +43,9 @@ entry as their argument. Currently, the existing events for a heuristic are:
 * after_response: called after the content of the response has been read. Useful for filtering based on content.
 * on_timeout: called when the request timeout, before the retry is performed. Useful to log timeout in the knowledge 
               base.
+* on_request_successful: called after all other events when the request was successful and not rejected by another 
+                         heuristic. It is invoked after the entry has released the limiter, so other requests can
+                         be scheduled in this event without creating a deadlock.
 
 To create your own heuristic, defined a class with one or more of the events, depending of what your heuristic need 
 to do.
