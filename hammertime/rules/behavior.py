@@ -66,11 +66,8 @@ class RejectErrorBehavior:
 
     async def after_response(self, entry):
         await self.behavior_change_detection.after_response(entry)
-        try:
-            if getattr(entry.result, "error_behavior", False):
-                raise BehaviorError()
-        except KeyError:
-            pass
+        if entry.result.error_behavior:
+            raise BehaviorError()
 
 
 class BehaviorError(RejectRequest):

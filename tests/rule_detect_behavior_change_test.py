@@ -99,6 +99,7 @@ class TestRejectErrorBehavior(TestCase):
     @async_test()
     async def test_after_response_check_for_behavior_change(self, loop):
         self.heuristic.behavior_change_detection.after_response.return_value = fake_future(None, loop)
+        self.entry.result.error_behavior = False
 
         await self.heuristic.after_response(self.entry)
 
