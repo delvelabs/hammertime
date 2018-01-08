@@ -16,8 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-from uuid import uuid4
 import asyncio
+from urllib.parse import urlparse
 
 from hammertime.ruleset import HammerTimeException
 
@@ -25,26 +25,34 @@ from hammertime.ruleset import HammerTimeException
 class DeadHostDetection:
 
     def __init__(self):
-        self.pending_requests = {}
-        self.timeout_requests = set()
+        self.hosts = {}
 
     def set_kb(self, kb):
-        kb.pending_requests = self.pending_requests
-        kb.timeout_requests = self.timeout_requests
+        kb.hosts = self.hosts
 
     async def before_request(self, entry):
-        request_id = uuid4()
-        entry.arguments["uuid"] = request_id
-        self.pending_requests[request_id] = asyncio.Future()
+        host = urlparse(entry.request.url).netloc
+        if host in self.hosts:
+            if not self.hosts[host]["is_done"].done():
+                if entry.result.attempt == 1:
+                    self.hosts[host]["request_count"] += 1
+                else:
+                    await self.hosts[host]["is_done"]
+        else:
+            self.hosts[host] = {"request_count": 1, "timeout_requests": 0, "is_done": asyncio.Future()}
 
     async def after_headers(self, entry):
-        if entry.arguments["uuid"] in self.pending_requests:
-            self.pending_requests.pop(entry.arguments["uuid"])
+        host = urlparse(entry.request.url).netloc
+        self.hosts[host]["request_count"] = 0
+        if not self.hosts[host]["is_done"].done():
+            self.hosts[host]["is_done"].set_result(None)
 
     async def on_timeout(self, entry):
-        self.timeout_requests.add(entry.arguments["uuid"])
-        if self.pending_requests.keys() == self.timeout_requests:
-            raise OfflineHostException()
+        host = urlparse(entry.request.url).netloc
+        if not self.hosts[host]["is_done"].done():
+            self.hosts[host]["timeout_requests"] += 1
+            if self.hosts[host]["timeout_requests"] == self.hosts[host]["request_count"]:
+                raise OfflineHostException("%s is offline" % host)
 
 
 class OfflineHostException(HammerTimeException):
