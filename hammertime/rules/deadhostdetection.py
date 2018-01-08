@@ -24,8 +24,9 @@ from hammertime.ruleset import HammerTimeException
 
 class DeadHostDetection:
 
-    def __init__(self):
+    def __init__(self, threshold=50):
         self.hosts = {}
+        self.threshold = threshold
 
     def set_kb(self, kb):
         kb.hosts = self.hosts
@@ -44,17 +45,20 @@ class DeadHostDetection:
     async def after_headers(self, entry):
         host = urlparse(entry.request.url).netloc
         self.hosts[host]["request_count"] = 0
+        self.hosts[host]["timeout_requests"] = 0
         if not self.hosts[host]["is_done"].done():
             self.hosts[host]["is_done"].set_result(None)
 
     async def on_timeout(self, entry):
         host = urlparse(entry.request.url).netloc
-        if not self.hosts[host]["is_done"].done():
-            self.hosts[host]["timeout_requests"] += 1
-            if self.hosts[host]["timeout_requests"] == self.hosts[host]["request_count"]:
-                exception = OfflineHostException("%s is offline" % host)
-                self.hosts[host]["is_done"].set_exception(exception)
-                raise exception
+        if self.hosts[host]["is_done"].done():
+            self.hosts[host]["is_done"] = asyncio.Future()
+        self.hosts[host]["timeout_requests"] += 1
+        timeout_count = self.hosts[host]["timeout_requests"]
+        if timeout_count == self.hosts[host]["request_count"] or timeout_count >= self.threshold:
+            exception = OfflineHostException("%s is offline" % host)
+            self.hosts[host]["is_done"].set_exception(exception)
+            raise exception
 
 
 class OfflineHostException(HammerTimeException):
