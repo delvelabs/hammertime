@@ -52,7 +52,9 @@ class DeadHostDetection:
         if not self.hosts[host]["is_done"].done():
             self.hosts[host]["timeout_requests"] += 1
             if self.hosts[host]["timeout_requests"] == self.hosts[host]["request_count"]:
-                raise OfflineHostException("%s is offline" % host)
+                exception = OfflineHostException("%s is offline" % host)
+                self.hosts[host]["is_done"].set_exception(exception)
+                raise exception
 
 
 class OfflineHostException(HammerTimeException):

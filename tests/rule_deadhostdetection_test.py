@@ -94,6 +94,21 @@ class TestDeadHostDetection(TestCase):
             await detection.before_request(entry)
 
     @async_test()
+    async def test_before_request_raise_offline_host_exception_for_retries_if_all_first_attempts_failed(self, loop):
+        detection = DeadHostDetection()
+        kb = KnowledgeBase()
+        detection.set_kb(kb)
+        entry = Entry.create("http://example.com/")
+        entry.result.attempt = 2
+        future = asyncio.Future(loop=loop)
+        future.done = MagicMock(return_value=False)
+        future.set_exception(OfflineHostException())
+        kb.hosts["example.com"] = {"request_count": 1, "is_done": future}
+
+        with self.assertRaises(OfflineHostException):
+            await detection.before_request(entry)
+
+    @async_test()
     async def test_after_headers_set_lock_to_done_for_host_and_clear_request_count(self, loop):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
@@ -152,6 +167,22 @@ class TestDeadHostDetection(TestCase):
             await detection.on_timeout(entries[-1])
 
     @async_test()
+    async def test_on_timeout_set_offline_host_exception_for_lock_if_all_requests_timed_out(self):
+        detection = DeadHostDetection()
+        kb = KnowledgeBase()
+        detection.set_kb(kb)
+        entry = Entry.create("http://example.com/")
+
+        await detection.before_request(entry)
+        try:
+            await detection.on_timeout(entry)
+        except OfflineHostException:
+            pass
+
+        with self.assertRaises(OfflineHostException):
+            await kb.hosts["example.com"]["is_done"]
+
+    @async_test()
     async def test_on_timeout_do_nothing_if_a_previous_request_to_host_was_successful(self):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
@@ -168,4 +199,3 @@ class TestDeadHostDetection(TestCase):
 
 class FutureAwaited(Exception):
     pass
-
