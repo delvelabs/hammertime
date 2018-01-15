@@ -32,33 +32,42 @@ class DeadHostDetection:
         kb.hosts = self.hosts
 
     async def before_request(self, entry):
-        host = urlparse(entry.request.url).netloc
+        host = self._get_host(entry)
         if host in self.hosts:
-            if not self.hosts[host]["is_done"].done():
-                if entry.result.attempt == 1:
+            if not self.hosts[host]["pending_requests"].done():
+                if self._is_first_attempt(entry):
                     self.hosts[host]["request_count"] += 1
                 else:
-                    await self.hosts[host]["is_done"]
+                    await self.hosts[host]["pending_requests"]
         else:
-            self.hosts[host] = {"request_count": 1, "timeout_requests": 0, "is_done": asyncio.Future()}
+            self.hosts[host] = {"request_count": 1, "timeout_requests": 0, "pending_requests": asyncio.Future()}
 
     async def after_headers(self, entry):
-        host = urlparse(entry.request.url).netloc
+        host = self._get_host(entry)
         self.hosts[host]["request_count"] = 0
         self.hosts[host]["timeout_requests"] = 0
-        if not self.hosts[host]["is_done"].done():
-            self.hosts[host]["is_done"].set_result(None)
+        if not self.hosts[host]["pending_requests"].done():
+            self.hosts[host]["pending_requests"].set_result(None)
 
     async def on_timeout(self, entry):
-        host = urlparse(entry.request.url).netloc
-        if self.hosts[host]["is_done"].done():
-            self.hosts[host]["is_done"] = asyncio.Future()
+        host = self._get_host(entry)
+        if self.hosts[host]["pending_requests"].done():
+            self.hosts[host]["pending_requests"] = asyncio.Future()
         self.hosts[host]["timeout_requests"] += 1
-        timeout_count = self.hosts[host]["timeout_requests"]
-        if timeout_count == self.hosts[host]["request_count"] or timeout_count >= self.threshold:
+        if self._is_host_dead(host):
             exception = OfflineHostException("%s is offline" % host)
-            self.hosts[host]["is_done"].set_exception(exception)
+            self.hosts[host]["pending_requests"].set_exception(exception)
             raise exception
+
+    def _get_host(self, entry):
+        return urlparse(entry.request.url).netloc
+
+    def _is_first_attempt(self, entry):
+        return entry.result.attempt == 1
+
+    def _is_host_dead(self, host):
+        timeout_count = self.hosts[host]["timeout_requests"]
+        return timeout_count == self.hosts[host]["request_count"] or timeout_count >= self.threshold
 
 
 class OfflineHostException(HammerTimeException):

@@ -63,7 +63,7 @@ class TestDeadHostDetection(TestCase):
 
         await detection.before_request(entry)
 
-        self.assertIsInstance(kb.hosts["example.com"]["is_done"], asyncio.Future)
+        self.assertIsInstance(kb.hosts["example.com"]["pending_requests"], asyncio.Future)
 
     @async_test()
     async def test_before_request_does_nothing_if_previous_request_successful(self):
@@ -72,7 +72,7 @@ class TestDeadHostDetection(TestCase):
         detection.set_kb(kb)
         future = MagicMock()
         future.done.return_value = True
-        kb.hosts["example.com"] = {"is_done": future, "request_count": 0}
+        kb.hosts["example.com"] = {"pending_requests": future, "request_count": 0}
 
         await detection.before_request(Entry.create("http://example.com/"))
 
@@ -88,7 +88,7 @@ class TestDeadHostDetection(TestCase):
         future = asyncio.Future(loop=loop)
         future.done = MagicMock(return_value=False)
         future.set_exception(FutureAwaited())
-        kb.hosts["example.com"] = {"request_count": 1, "is_done": future}
+        kb.hosts["example.com"] = {"request_count": 1, "pending_requests": future}
 
         with self.assertRaises(FutureAwaited):
             await detection.before_request(entry)
@@ -103,7 +103,7 @@ class TestDeadHostDetection(TestCase):
         future = asyncio.Future(loop=loop)
         future.done = MagicMock(return_value=False)
         future.set_exception(OfflineHostException())
-        kb.hosts["example.com"] = {"request_count": 1, "is_done": future}
+        kb.hosts["example.com"] = {"request_count": 1, "pending_requests": future}
 
         with self.assertRaises(OfflineHostException):
             await detection.before_request(entry)
@@ -113,9 +113,9 @@ class TestDeadHostDetection(TestCase):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
-        kb.hosts["example.com"] = {"request_count": 2, "is_done": asyncio.Future(loop=loop), "timeout_requests": 1}
-        kb.hosts["www.test.com"] = {"request_count": 1, "is_done": asyncio.Future(loop=loop), "timeout_requests": 1}
-        kb.hosts["10.11.12.13:8080"] = {"request_count": 3, "is_done": asyncio.Future(loop=loop), "timeout_requests": 2}
+        kb.hosts["example.com"] = {"request_count": 2, "pending_requests": asyncio.Future(loop=loop), "timeout_requests": 1}
+        kb.hosts["www.test.com"] = {"request_count": 1, "pending_requests": asyncio.Future(loop=loop), "timeout_requests": 1}
+        kb.hosts["10.11.12.13:8080"] = {"request_count": 3, "pending_requests": asyncio.Future(loop=loop), "timeout_requests": 2}
 
         await detection.after_headers(Entry.create("http://example.com/"))
         await detection.after_headers(Entry.create("http://www.test.com/"))
@@ -123,13 +123,13 @@ class TestDeadHostDetection(TestCase):
 
         self.assertEqual(kb.hosts["example.com"]["request_count"], 0)
         self.assertEqual(kb.hosts["example.com"]["timeout_requests"], 0)
-        self.assertTrue(kb.hosts["example.com"]["is_done"].done())
+        self.assertTrue(kb.hosts["example.com"]["pending_requests"].done())
         self.assertEqual(kb.hosts["www.test.com"]["request_count"], 0)
         self.assertEqual(kb.hosts["www.test.com"]["timeout_requests"], 0)
-        self.assertTrue(kb.hosts["www.test.com"]["is_done"].done())
+        self.assertTrue(kb.hosts["www.test.com"]["pending_requests"].done())
         self.assertEqual(kb.hosts["10.11.12.13:8080"]["request_count"], 0)
         self.assertEqual(kb.hosts["10.11.12.13:8080"]["timeout_requests"], 0)
-        self.assertTrue(kb.hosts["10.11.12.13:8080"]["is_done"].done())
+        self.assertTrue(kb.hosts["10.11.12.13:8080"]["pending_requests"].done())
 
     @async_test()
     async def test_on_timeout_increment_timeout_requests_for_host(self):
@@ -160,11 +160,11 @@ class TestDeadHostDetection(TestCase):
         kb = KnowledgeBase()
         detection.set_kb(kb)
         future = fake_future(None, loop=loop)
-        kb.hosts["example.com"] = {"request_count": 0, "is_done": future, "timeout_requests": 0}
+        kb.hosts["example.com"] = {"request_count": 0, "pending_requests": future, "timeout_requests": 0}
 
         await detection.on_timeout(Entry.create("http://example.com/"))
 
-        self.assertFalse(kb.hosts["example.com"]["is_done"].done())
+        self.assertFalse(kb.hosts["example.com"]["pending_requests"].done())
 
     @async_test()
     async def test_on_timeout_raise_offline_host_exception_if_timeout_requests_exceed_threshold(self):
@@ -210,7 +210,7 @@ class TestDeadHostDetection(TestCase):
             pass
 
         with self.assertRaises(OfflineHostException):
-            await kb.hosts["example.com"]["is_done"]
+            await kb.hosts["example.com"]["pending_requests"]
 
 
 class FutureAwaited(Exception):
