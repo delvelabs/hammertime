@@ -31,7 +31,7 @@ class DeadHostDetection:
     def set_kb(self, kb):
         kb.hosts = self.hosts
 
-    async def before_request(self, entry):
+    async def before_attempt(self, entry):
         host = self._get_host(entry)
         if host in self.hosts:
             if not self.hosts[host]["pending_requests"].done():
@@ -41,6 +41,13 @@ class DeadHostDetection:
                     await self.hosts[host]["pending_requests"]
         else:
             self.hosts[host] = {"request_count": 1, "timeout_requests": 0, "pending_requests": asyncio.Future()}
+
+    async def before_request(self, entry):
+        host = self._get_host(entry)
+        if host in self.hosts:
+            lock = self.hosts[host]["pending_requests"]
+            if lock.done() and lock.exception():
+                raise lock.exception()
 
     async def after_headers(self, entry):
         host = self._get_host(entry)

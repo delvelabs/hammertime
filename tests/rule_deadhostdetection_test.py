@@ -33,7 +33,7 @@ class TestDeadHostDetection(TestCase):
         pass
 
     @async_test()
-    async def test_before_request_increment_request_count_for_host(self):
+    async def test_before_attempt_increment_request_count_for_host(self):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
@@ -41,32 +41,32 @@ class TestDeadHostDetection(TestCase):
         netloc1 = "www.test.example"
         netloc2 = "10.0.0.10:8080"
 
-        await detection.before_request(Entry.create("http://example.com/test"))
-        await detection.before_request(Entry.create("http://example.com/12"))
+        await detection.before_attempt(Entry.create("http://example.com/test"))
+        await detection.before_attempt(Entry.create("http://example.com/12"))
 
-        await detection.before_request(Entry.create("http://www.test.example/index.html"))
+        await detection.before_attempt(Entry.create("http://www.test.example/index.html"))
 
-        await detection.before_request(Entry.create("http://10.0.0.10:8080/qw"))
-        await detection.before_request(Entry.create("http://10.0.0.10:8080/we"))
-        await detection.before_request(Entry.create("http://10.0.0.10:8080/rt"))
+        await detection.before_attempt(Entry.create("http://10.0.0.10:8080/qw"))
+        await detection.before_attempt(Entry.create("http://10.0.0.10:8080/we"))
+        await detection.before_attempt(Entry.create("http://10.0.0.10:8080/rt"))
 
         self.assertEqual(kb.hosts[netloc0]["request_count"], 2)
         self.assertEqual(kb.hosts[netloc1]["request_count"], 1)
         self.assertEqual(kb.hosts[netloc2]["request_count"], 3)
 
     @async_test()
-    async def test_before_request_set_lock_on_new_host_with_pending_requests(self):
+    async def test_before_attempt_set_lock_on_new_host_with_pending_requests(self):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
         entry = Entry.create("http://example.com/")
 
-        await detection.before_request(entry)
+        await detection.before_attempt(entry)
 
         self.assertIsInstance(kb.hosts["example.com"]["pending_requests"], asyncio.Future)
 
     @async_test()
-    async def test_before_request_does_nothing_if_previous_request_successful(self):
+    async def test_before_attempt_does_nothing_if_previous_request_successful(self):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
@@ -74,12 +74,12 @@ class TestDeadHostDetection(TestCase):
         future.done.return_value = True
         kb.hosts["example.com"] = {"pending_requests": future, "request_count": 0}
 
-        await detection.before_request(Entry.create("http://example.com/"))
+        await detection.before_attempt(Entry.create("http://example.com/"))
 
         self.assertEqual(kb.hosts["example.com"]["request_count"], 0)
 
     @async_test()
-    async def test_before_request_await_pending_requests_for_host_before_retries(self, loop):
+    async def test_before_attempt_await_pending_requests_for_host_before_retries(self, loop):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
@@ -91,10 +91,10 @@ class TestDeadHostDetection(TestCase):
         kb.hosts["example.com"] = {"request_count": 1, "pending_requests": future}
 
         with self.assertRaises(FutureAwaited):
-            await detection.before_request(entry)
+            await detection.before_attempt(entry)
 
     @async_test()
-    async def test_before_request_raise_offline_host_exception_for_retries_if_all_first_attempts_failed(self, loop):
+    async def test_before_attempt_raise_offline_host_exception_for_retries_if_all_first_attempts_failed(self, loop):
         detection = DeadHostDetection()
         kb = KnowledgeBase()
         detection.set_kb(kb)
@@ -106,7 +106,7 @@ class TestDeadHostDetection(TestCase):
         kb.hosts["example.com"] = {"request_count": 1, "pending_requests": future}
 
         with self.assertRaises(OfflineHostException):
-            await detection.before_request(entry)
+            await detection.before_attempt(entry)
 
     @async_test()
     async def test_after_headers_set_lock_to_done_for_host_and_reset_state(self, loop):
@@ -137,9 +137,9 @@ class TestDeadHostDetection(TestCase):
         kb = KnowledgeBase()
         detection.set_kb(kb)
         for i in range(10):
-            await detection.before_request(Entry.create("http://example.com/"))
-            await detection.before_request(Entry.create("http://www.test.com/"))
-            await detection.before_request(Entry.create("http://10.10.10.10:8080/"))
+            await detection.before_attempt(Entry.create("http://example.com/"))
+            await detection.before_attempt(Entry.create("http://www.test.com/"))
+            await detection.before_attempt(Entry.create("http://10.10.10.10:8080/"))
 
         await detection.on_timeout(Entry.create("http://example.com/"))
         await detection.on_timeout(Entry.create("http://example.com/"))
@@ -173,7 +173,7 @@ class TestDeadHostDetection(TestCase):
         detection.set_kb(kb)
         entries = [Entry.create("http://example.com/%d" % i) for i in range(30)]
         for entry in entries:
-            await detection.before_request(entry)
+            await detection.before_attempt(entry)
 
         for entry in entries[:19]:  # only 19 requests have timed out, no exception should be raised.
             await detection.on_timeout(entry)
@@ -188,7 +188,7 @@ class TestDeadHostDetection(TestCase):
         detection.set_kb(kb)
         entries = [Entry.create("http://example.com/%d" % i) for i in range(10)]
         for entry in entries:
-            await detection.before_request(entry)
+            await detection.before_attempt(entry)
 
         for entry in entries[:-1]:  # last entry has not timed out, no exception should be raised.
             await detection.on_timeout(entry)
@@ -203,7 +203,7 @@ class TestDeadHostDetection(TestCase):
         detection.set_kb(kb)
         entry = Entry.create("http://example.com/")
 
-        await detection.before_request(entry)
+        await detection.before_attempt(entry)
         try:
             await detection.on_timeout(entry)
         except OfflineHostException:
@@ -218,7 +218,7 @@ class TestDeadHostDetection(TestCase):
         kb = KnowledgeBase()
         detection.set_kb(kb)
         entry = Entry.create("http://example.com/")
-        await detection.before_request(entry)
+        await detection.before_attempt(entry)
         expected = OfflineHostException("exception 1")
         kb.hosts["example.com"]["pending_requests"].set_exception(expected)
 
@@ -228,6 +228,18 @@ class TestDeadHostDetection(TestCase):
             pass
 
         self.assertEqual(expected, kb.hosts["example.com"]["pending_requests"].exception())
+
+    @async_test()
+    async def test_before_request_raise_offline_host_exception_if_host_is_offline(self):
+        detection = DeadHostDetection()
+        kb = KnowledgeBase()
+        detection.set_kb(kb)
+        entry = Entry.create("http://example.com/")
+        await detection.before_attempt(entry)
+        kb.hosts["example.com"]["pending_requests"].set_exception(OfflineHostException())
+
+        with self.assertRaises(OfflineHostException):
+            await detection.before_request(entry)
 
 
 class FutureAwaited(Exception):
