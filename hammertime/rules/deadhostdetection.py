@@ -51,9 +51,13 @@ class DeadHostDetection:
 
     async def on_timeout(self, entry):
         host = self._get_host(entry)
-        if self.hosts[host]["pending_requests"].done():
-            self.hosts[host]["pending_requests"] = asyncio.Future()
         self.hosts[host]["timeout_requests"] += 1
+        if self.hosts[host]["pending_requests"].done():
+            if self.hosts[host]["pending_requests"].exception() is None:
+                self.hosts[host]["pending_requests"] = asyncio.Future()
+            else:
+                raise self.hosts[host]["pending_requests"].exception()
+
         if self._is_host_dead(host):
             exception = OfflineHostException("%s is offline" % host)
             self.hosts[host]["pending_requests"].set_exception(exception)

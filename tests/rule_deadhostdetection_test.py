@@ -212,6 +212,23 @@ class TestDeadHostDetection(TestCase):
         with self.assertRaises(OfflineHostException):
             await kb.hosts["example.com"]["pending_requests"]
 
+    @async_test()
+    async def test_on_timeout_dont_set_new_exception_for_lock_if_previous_request_timed_out(self):
+        detection = DeadHostDetection()
+        kb = KnowledgeBase()
+        detection.set_kb(kb)
+        entry = Entry.create("http://example.com/")
+        await detection.before_request(entry)
+        expected = OfflineHostException("exception 1")
+        kb.hosts["example.com"]["pending_requests"].set_exception(expected)
+
+        try:
+            await detection.on_timeout(entry)
+        except OfflineHostException:
+            pass
+
+        self.assertEqual(expected, kb.hosts["example.com"]["pending_requests"].exception())
+
 
 class FutureAwaited(Exception):
     pass
