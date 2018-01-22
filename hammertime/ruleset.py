@@ -20,7 +20,7 @@ import asyncio
 
 class Heuristics:
 
-    EVENTS = {"before_request", "after_headers", "after_response", "on_timeout", "on_request_successful", "on_error",
+    EVENTS = {"before_request", "after_headers", "after_response", "on_timeout", "on_request_successful",
               "on_host_unreachable"}
 
     def __init__(self, kb=None, request_engine=None):
