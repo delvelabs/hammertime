@@ -21,14 +21,17 @@ from .status import RejectStatusCode, DetectSoft404
 from .timeout import DynamicTimeout
 from .redirects import FollowRedirects
 from .deadhostdetection import DeadHostDetection
+from .behavior import DetectBehaviorChange, RejectErrorBehavior
 
 
 __all__ = [
     DeadHostDetection,
+    DetectBehaviorChange,
     DetectSoft404,
     DynamicTimeout,
     FollowRedirects,
     IgnoreLargeBody,
+    RejectErrorBehavior,
     RejectStatusCode,
     SetHeader,
 ]

@@ -102,7 +102,7 @@ Parameters:
 * value: The value for the field.
 
 
-**class hammertime.rules.FollowRedirects(\*, max_redirects=15, stats)**
+**class hammertime.rules.FollowRedirects(\*, max_redirects=15)**
 
 Follow redirects and store all the intermediate [HTTP entries](reference.md#entry) in the result of the initial entry. 
 The complete path between the initial request and the final (non-redirect) response can be retrieved from 
@@ -112,3 +112,37 @@ entry = await hammertime.request("http://example.com/")
 for entry in entry.result.redirects:
     pass
 ```
+
+Parameters:
+
+* max_redirects: Maximum redirects the heuristic will follow for a request before rejecting the request. Default is 15.
+
+
+**class hammertime.rules.DetectBehaviorChange(buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, 
+                                              token_size=4)**
+
+This heuristic catches the server's behavior change, such as a WAF starting to block all requests. It compares the 
+responses and flag the entries as an error behavior when a lot of identical or very similar responses are received.
+To test if a request is an error behavior:
+```python
+entry = await hammertime.request("http://example.com/")
+if entry.result.error_behavior:
+    # Response is not the normal behavior.
+```
+
+Parameters:
+
+* buffer_size: The amount of requests to store for behavior comparison. Each response will be compared with the last 
+               *buffer_size* responses. Default is 10.
+* match_threshold: The equality threshold in bit when comparing simhash of responses. Two simhash with *match_threshold*
+                   or more bit that differ will be unequal. Default is 5.
+* match_filter: Regex to filter characters used to compute the simhash of the responses. Default is 
+                r'[\w\u4e00-\u9fcc<>]+'
+* token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
+
+
+**class hammertime.rules.RejectErrorBehavior()**
+
+Reject entries that have the attribute *result.error_behavior* set to True by raising hammertime.behavior.BehaviorError.
+ Must be called after a heuristic that set this attribute, like DetectBehaviorChange. Add the other heuristic before 
+this one when configuring HammerTime's heuristic.
