@@ -63,14 +63,11 @@ class TestDeadHostDetection(TestCase):
         await self.dead_host_detection.before_request(Entry.create("http://www.test.com/"))
         await self.dead_host_detection.before_request(Entry.create("http://10.10.10.10:8080/"))
 
-        await self.dead_host_detection.on_timeout(Entry.create("http://example.com/"))
-        await self.dead_host_detection.on_timeout(Entry.create("http://example.com/"))
-
+        for i in range(2):
+            await self.dead_host_detection.on_timeout(Entry.create("http://example.com/"))
         await self.dead_host_detection.on_timeout(Entry.create("http://www.test.com/"))
-
-        await self.dead_host_detection.on_timeout(Entry.create("http://10.10.10.10:8080/"))
-        await self.dead_host_detection.on_timeout(Entry.create("http://10.10.10.10:8080/"))
-        await self.dead_host_detection.on_timeout(Entry.create("http://10.10.10.10:8080/"))
+        for i in range(3):
+            await self.dead_host_detection.on_timeout(Entry.create("http://10.10.10.10:8080/"))
 
         self.assertEqual(self.dead_host_detection.hosts["example.com"]["timeout_requests"], 2)
         self.assertEqual(self.dead_host_detection.hosts["www.test.com"]["timeout_requests"], 1)

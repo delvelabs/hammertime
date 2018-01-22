@@ -44,7 +44,6 @@ class RetryEngine(Engine):
     async def _perform(self, limiter, entry, heuristics):
         while True:
             try:
-                await heuristics.before_attempt(entry)
                 async with limiter:
                     entry = await self.request_engine.perform(entry, heuristics=heuristics)
                 await heuristics.on_request_successful(entry)
