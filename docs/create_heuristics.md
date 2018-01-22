@@ -48,8 +48,7 @@ entry as their argument. Currently, the existing events for a heuristic are:
 * on_request_successful: called after all other events when the request was successful and not rejected by another 
                          heuristic. It is invoked after the entry has released the limiter, so other requests can
                          be scheduled in this event without creating a deadlock.
-* on_error: called when the request engine raised an error other than a RequestTimeout error (i.e. a response was 
-            received but was rejected or an exception was raised).
+* on_host_unreachable: called when the host is unreachable, before the engine raises a StopRequest exception.
 
 To create your own heuristic, defined a class with one or more of the events, depending of what your heuristic need 
 to do.

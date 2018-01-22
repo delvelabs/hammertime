@@ -97,10 +97,20 @@ class TestDeadHostDetection(TestCase):
         self.assertIn("example.com", self.kb.dead_hosts)
 
     @async_test()
-    async def test_on_error_reset_timeout_requests_count(self):
+    async def test_on_host_unreachable_increment_timeout_requests_count(self):
         entry = Entry.create("http://example.com/")
-        self.dead_host_detection.hosts["example.com"] = {"timeout_requests": 50}
+        self.dead_host_detection.hosts["example.com"] = {"timeout_requests": 0}
 
-        await self.dead_host_detection.on_error(entry)
+        await self.dead_host_detection.on_host_unreachable(entry)
 
-        self.assertEqual(self.dead_host_detection.hosts["example.com"]["timeout_requests"], 0)
+        self.assertEqual(self.dead_host_detection.hosts["example.com"]["timeout_requests"], 1)
+
+    @async_test()
+    async def test_on_host_unreachable_raise_offline_host_exception_if_timeout_requests_count_exceed_threshold(self):
+        entry = Entry.create("http://example.com/")
+        self.dead_host_detection.hosts["example.com"] = {"timeout_requests": 49}
+
+        with self.assertRaises(OfflineHostException):
+            await self.dead_host_detection.on_host_unreachable(entry)
+
+        self.assertIn("example.com", self.kb.dead_hosts)

@@ -47,8 +47,8 @@ class DeadHostDetection:
         if host in self.dead_hosts or self._is_host_dead(host):
             raise OfflineHostException("%s is offline" % host)
 
-    async def on_error(self, entry):
-        self.hosts[self._get_host(entry)]["timeout_requests"] = 0
+    async def on_host_unreachable(self, entry):
+        await self.on_timeout(entry)
 
     def _get_host(self, entry):
         return urlparse(entry.request.url).netloc

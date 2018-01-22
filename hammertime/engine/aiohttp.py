@@ -47,6 +47,7 @@ class AioHttpEngine:
             await heuristics.on_timeout(entry)
             raise RequestTimeout("Timeout reached")
         except ClientOSError:
+            await heuristics.on_host_unreachable(entry)
             raise StopRequest("Host Unreachable")
         except ClientResponseError:
             raise StopRequest("Connection Error")

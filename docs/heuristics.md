@@ -152,7 +152,7 @@ this one when configuring HammerTime's heuristic.
 
 Raise OfflineHostException if the destination host is or become unresponsive. A host is considered dead if the amount of
  requests that timed out in a row exceed threshold. If the host is declared dead all pending requests raise 
- OfflineHostException.
+ OfflineHostException. Host unreachable errors count as timeout errors.
 
 Parameter:
 
