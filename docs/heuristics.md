@@ -148,13 +148,15 @@ Reject entries that have the attribute *result.error_behavior* set to True by ra
 this one when configuring HammerTime's heuristic.
 
 
-**class hammertime.rules.DeadHostDetection(threshold=50)**
+**class hammertime.rules.DeadHostDetection(threshold=50, wait_time=0.5)**
 
 Raise OfflineHostException if the destination host is or become unresponsive. A host is considered dead if all requests 
-sent to it timed out, or if threshold requests in a row timed out, whichever condition comes first. No retry will be
-sent until the host has sent a least one response. If the host is declared dead all pending retries raise 
-OfflineHostException. Any request that timed out blocks the retries until it becomes responsive again.
+sent to it timed out, or if threshold requests in a row timed out, whichever condition comes first. Retries will be
+delayed for wait_time if the host may be dead (i.e. until the host has sent a least one response). If the host is 
+declared dead all pending retries raise OfflineHostException. Any request that timed out triggers future retries to wait 
+for wait_time until the host is responsive again.
 
 Parameter:
 
 * threshold: The amount of timed out requests in a row required to declared the destination host as dead. Default is 50.
+* wait_time: time to wait before attempting a retries if the host did not respond yet or the last requests timed out.
