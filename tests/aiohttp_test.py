@@ -21,7 +21,7 @@ from fixtures import async_test
 
 from hammertime.engine.aiohttp import AioHttpEngine
 from hammertime.http import Entry
-from hammertime.ruleset import Heuristics
+from hammertime.ruleset import Heuristics, RequestTimeout
 
 from aiohttp.test_utils import make_mocked_coro
 import asyncio
@@ -90,6 +90,14 @@ class TestAioHttpEngine(TestCase):
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=ANY, allow_redirects=False,
                                                        headers={"User-Agent": "Hammertime 1.2.3"})
+
+    @async_test()
+    async def test_perform_raise_request_timeout_if_timeout(self, loop):
+        engine = AioHttpEngine(loop=loop)
+        engine._perform = make_mocked_coro(raise_exception=asyncio.TimeoutError())
+
+        with self.assertRaises(RequestTimeout):
+            await engine.perform(Entry.create("http://example.com/"), Heuristics())
 
 
 class FakeResponse:

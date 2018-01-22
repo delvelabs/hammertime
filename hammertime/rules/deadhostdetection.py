@@ -51,10 +51,7 @@ class DeadHostDetection:
 
     async def after_headers(self, entry):
         host = self._get_host(entry)
-        self.hosts[host]["request_count"] = 0
-        self.hosts[host]["timeout_requests"] = 0
-        if not self.hosts[host]["pending_requests"].done():
-            self.hosts[host]["pending_requests"].set_result(None)
+        self._on_host_response(host)
 
     async def on_timeout(self, entry):
         host = self._get_host(entry)
@@ -69,6 +66,16 @@ class DeadHostDetection:
             exception = OfflineHostException("%s is offline" % host)
             self.hosts[host]["pending_requests"].set_exception(exception)
             raise exception
+
+    async def on_error(self, entry):
+        host = self._get_host(entry)
+        self._on_host_response(host)
+
+    def _on_host_response(self, host):
+        self.hosts[host]["request_count"] = 0
+        self.hosts[host]["timeout_requests"] = 0
+        if not self.hosts[host]["pending_requests"].done():
+            self.hosts[host]["pending_requests"].set_result(None)
 
     def _get_host(self, entry):
         return urlparse(entry.request.url).netloc

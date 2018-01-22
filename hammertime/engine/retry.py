@@ -19,7 +19,7 @@ import asyncio
 from weakref import ref as weakref
 
 from . import Engine
-from ..ruleset import StopRequest
+from ..ruleset import StopRequest, RequestTimeout
 
 
 class RetryEngine(Engine):
@@ -49,7 +49,9 @@ class RetryEngine(Engine):
                     entry = await self.request_engine.perform(entry, heuristics=heuristics)
                 await heuristics.on_request_successful(entry)
                 return entry
-            except StopRequest:
+            except (StopRequest, RequestTimeout) as e:
+                if e is RequestTimeout:
+                    await heuristics.on_error(entry)
                 if entry.result.attempt > self.retry_count:
                     raise
                 else:

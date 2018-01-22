@@ -21,7 +21,7 @@ import asyncio
 class Heuristics:
 
     EVENTS = {"before_request", "after_headers", "after_response", "on_timeout", "on_request_successful",
-              "before_attempt"}
+              "before_attempt", "on_error"}
 
     def __init__(self, kb=None, request_engine=None):
         self.rulesets = {event: RuleSet() for event in self.EVENTS}
@@ -82,4 +82,7 @@ class StopRequest(HammerTimeException):
 
 
 class RejectRequest(HammerTimeException):
+    pass
+
+class RequestTimeout(HammerTimeException):
     pass

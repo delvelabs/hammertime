@@ -241,6 +241,18 @@ class TestDeadHostDetection(TestCase):
         with self.assertRaises(OfflineHostException):
             await detection.before_request(entry)
 
+    @async_test()
+    async def test_on_error_set_pending_lock_to_done(self):
+        detection = DeadHostDetection()
+        kb = KnowledgeBase()
+        detection.set_kb(kb)
+        entry = Entry.create("http://example.com/")
+        await detection.before_attempt(entry)
+
+        await detection.on_error(entry)
+
+        self.assertTrue(kb.hosts["example.com"]["pending_requests"].done())
+
 
 class FutureAwaited(Exception):
     pass
