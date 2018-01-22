@@ -146,3 +146,15 @@ Parameters:
 Reject entries that have the attribute *result.error_behavior* set to True by raising hammertime.behavior.BehaviorError.
  Must be called after a heuristic that set this attribute, like DetectBehaviorChange. Add the other heuristic before 
 this one when configuring HammerTime's heuristic.
+
+
+**class hammertime.rules.DeadHostDetection(threshold=50)**
+
+Raise OfflineHostException if the destination host is or become unresponsive. A host is considered dead if all requests 
+sent to it timed out, or if threshold requests in a row timed out, whichever condition comes first. No retry will be
+sent until the host has sent a least one response. If the host is declared dead all pending retries raise 
+OfflineHostException. Any request that timed out blocks the retries until it becomes responsive again.
+
+Parameter:
+
+* threshold: The amount of timed out requests in a row required to declared the destination host as dead. Default is 50.

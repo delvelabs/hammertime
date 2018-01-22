@@ -50,7 +50,7 @@ class RetryEngine(Engine):
                 await heuristics.on_request_successful(entry)
                 return entry
             except (StopRequest, RequestTimeout) as e:
-                if e is RequestTimeout:
+                if isinstance(e, StopRequest):
                     await heuristics.on_error(entry)
                 if entry.result.attempt > self.retry_count:
                     raise
