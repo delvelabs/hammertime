@@ -21,9 +21,9 @@ class MyHeuristic:
     async def on_timeout(self, entry):
     
     async def on_request_successful(self, entry):
-    
-    async def on_error(self, entry):
-        
+
+    async def on_host_unreachable(self, entry):
+
 ```
 
 The class for your heuristic must support at least one of the four [events](#events): before_request, after_headers, 

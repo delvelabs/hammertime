@@ -23,7 +23,7 @@ from aiohttp.client_exceptions import ClientOSError, ClientResponseError, Server
 from aiohttp.connector import TCPConnector
 import ssl
 
-from ..ruleset import StopRequest, RejectRequest, RequestTimeout
+from ..ruleset import StopRequest, RejectRequest
 
 
 class AioHttpEngine:
@@ -45,7 +45,7 @@ class AioHttpEngine:
             return await self._perform(entry, heuristics)
         except (asyncio.TimeoutError, asyncio.CancelledError):
             await heuristics.on_timeout(entry)
-            raise RequestTimeout("Timeout reached")
+            raise StopRequest("Timeout reached")
         except ClientOSError:
             await heuristics.on_host_unreachable(entry)
             raise StopRequest("Host Unreachable")

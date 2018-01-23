@@ -83,6 +83,3 @@ class StopRequest(HammerTimeException):
 
 class RejectRequest(HammerTimeException):
     pass
-
-class RequestTimeout(HammerTimeException):
-    pass
