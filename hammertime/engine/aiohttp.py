@@ -42,12 +42,12 @@ class AioHttpEngine:
     async def perform(self, entry, heuristics):
         try:
             await heuristics.before_request(entry)
-
             return await self._perform(entry, heuristics)
         except (asyncio.TimeoutError, asyncio.CancelledError):
             await heuristics.on_timeout(entry)
             raise StopRequest("Timeout reached")
         except ClientOSError:
+            await heuristics.on_host_unreachable(entry)
             raise StopRequest("Host Unreachable")
         except ClientResponseError:
             raise StopRequest("Connection Error")

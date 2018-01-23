@@ -21,11 +21,13 @@ class MyHeuristic:
     async def on_timeout(self, entry):
     
     async def on_request_successful(self, entry):
-        
+
+    async def on_host_unreachable(self, entry):
+
 ```
 
-The class for your heuristic must support at least one of the four [events](#events): before_request, after_headers, 
-after_response or on_timeout.
+The class for your heuristic must support at least one of the [events](#events): before_request, after_headers,
+after_response, on_timeout, on_request_successful or on_host_unreachable.
 
 set_engine and set_kb are optional. set_engine allows your heuristic to have a reference to the retry engine of 
 HammerTime. set_kb allows your heuristic to store its data in the [knowledge base](#knowledge-base).
@@ -46,6 +48,7 @@ entry as their argument. Currently, the existing events for a heuristic are:
 * on_request_successful: called after all other events when the request was successful and not rejected by another 
                          heuristic. It is invoked after the entry has released the limiter, so other requests can
                          be scheduled in this event without creating a deadlock.
+* on_host_unreachable: called when the host is unreachable, before the engine raises a StopRequest exception.
 
 To create your own heuristic, defined a class with one or more of the events, depending of what your heuristic need 
 to do.
