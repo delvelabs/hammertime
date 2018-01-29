@@ -180,6 +180,15 @@ class TestFollowRedirects(TestCase):
         with self.assertRaises(StopRequest):
             await self.rule.on_request_successful(self.entry)
 
+    @async_test()
+    async def test_on_request_successful_reject_request_to_other_host_if_redirect_same_host_only_is_true(self):
+        follow_redirect = FollowRedirects(same_host_only=True)
+        follow_redirect._perform_request = make_mocked_coro()
+        self.response.headers["location"] = "http://notsamehost.com/"
+
+        with self.assertRaises(RejectRequest):
+            await follow_redirect.on_request_successful(self.entry)
+
 
 class FakeEngine:
 
