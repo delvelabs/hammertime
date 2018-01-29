@@ -17,7 +17,7 @@
 
 
 from copy import copy
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from hammertime.http import Entry
 from hammertime.ruleset import Heuristics, RejectRequest
@@ -28,10 +28,11 @@ valid_redirects = (301, 302, 303, 307, 308)
 
 class FollowRedirects:
 
-    def __init__(self, *, max_redirect=15):
+    def __init__(self, *, max_redirect=15, same_host_only=False):
         self.max_redirect = max_redirect
         self.engine = None
         self.child_heuristics = Heuristics()
+        self.same_host_only = same_host_only
 
     def set_engine(self, engine):
         self.engine = engine
@@ -51,6 +52,8 @@ class FollowRedirects:
             try:
                 url = entry.response.headers["location"]
                 last_url = entry.result.redirects[-1].request.url
+                if self.same_host_only and not self._is_same_host(url, last_url):
+                    raise RejectRequest("Rejecting redirect to different host")
                 _entry = await self._perform_request(url, base_url=last_url)
                 entry.result.redirects.append(_entry)
                 entry.response = _entry.response
@@ -65,3 +68,8 @@ class FollowRedirects:
         entry = await self.engine.perform(entry, self.child_heuristics)
         self.engine.stats.completed += 1
         return entry
+
+    def _is_same_host(self, url, last_url):
+        last_host = urlparse(last_url).netloc
+        host = urlparse(urljoin(last_url, url)).netloc
+        return host == last_host
