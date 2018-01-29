@@ -15,25 +15,22 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .body import IgnoreLargeBody
-from .header import SetHeader
-from .status import RejectStatusCode, DetectSoft404
-from .timeout import DynamicTimeout
-from .redirects import FollowRedirects
-from .deadhostdetection import DeadHostDetection
-from .behavior import DetectBehaviorChange, RejectErrorBehavior
-from .filterrequestfromurl import FilterRequestFromURL
+
+import re
+
+from hammertime.ruleset import RejectRequest
 
 
-__all__ = [
-    DeadHostDetection,
-    DetectBehaviorChange,
-    DetectSoft404,
-    DynamicTimeout,
-    FilterRequestFromURL,
-    FollowRedirects,
-    IgnoreLargeBody,
-    RejectErrorBehavior,
-    RejectStatusCode,
-    SetHeader,
-]
+class FilterRequestFromURL:
+
+    def __init__(self, *, whitelist_regex=None, blacklist_regex=None):
+        self.whitelist_regex = whitelist_regex
+        self.blacklist_regex = blacklist_regex
+
+    async def before_request(self, entry):
+        if self.whitelist_regex is not None:
+            if not re.search(self.whitelist_regex, entry.request.url):
+                raise RejectRequest("Request URL %s is not in whitelist patterns" % entry.request.url)
+        elif self.blacklist_regex is not None:
+            if re.search(self.blacklist_regex, entry.request.url):
+                raise RejectRequest("Request URL %s is in blacklist patterns" % entry.request.url)
