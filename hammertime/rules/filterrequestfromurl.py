@@ -29,19 +29,28 @@ class FilterRequestFromURL:
         if regex_whitelist is not None and regex_blacklist is not None:
             raise ValueError("Cannot use both a white list and a black list.")
         if regex_whitelist is not None:
-            regex_whitelist = (regex_whitelist,) if isinstance(regex_whitelist, str) else regex_whitelist
+            regex_whitelist = self._to_iterable(regex_whitelist)
         self.regex_whitelist = regex_whitelist
         if regex_blacklist is not None:
-            regex_blacklist = (regex_blacklist,) if isinstance(regex_blacklist, str) else regex_blacklist
+            regex_blacklist = self._to_iterable(regex_blacklist)
         self.regex_blacklist = regex_blacklist
 
     async def before_request(self, entry):
+        url = entry.request.url
         if self.regex_whitelist:
-            for regex in self.regex_whitelist:
-                if re.search(regex, entry.request.url):
-                    return
-            raise RejectRequest("Request URL %s is not in whitelist patterns" % entry.request.url)
+            if not self._match_found(url, self.regex_whitelist):
+                raise RejectRequest("Request URL %s is not in whitelist patterns" % url)
         elif self.regex_blacklist:
-            for regex in self.regex_blacklist:
-                if re.search(regex, entry.request.url):
-                    raise RejectRequest("Request URL %s is in blacklist patterns" % entry.request.url)
+            if self._match_found(url, self.regex_blacklist):
+                raise RejectRequest("Request URL %s is in blacklist patterns" % url)
+
+    def _to_iterable(self, regex_list):
+        if isinstance(regex_list, str):
+            return regex_list,
+        return regex_list
+
+    def _match_found(self, url, regex_list):
+        for regex in regex_list:
+            if re.search(regex, url):
+                return True
+        return False
