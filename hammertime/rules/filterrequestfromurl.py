@@ -23,14 +23,21 @@ from hammertime.ruleset import RejectRequest
 
 class FilterRequestFromURL:
 
-    def __init__(self, *, whitelist_regex=None, blacklist_regex=None):
-        self.whitelist_regex = whitelist_regex
-        self.blacklist_regex = blacklist_regex
+    def __init__(self, *, regex_whitelist=None, regex_blacklist=None):
+        if regex_whitelist is not None:
+            regex_whitelist = (regex_whitelist,) if isinstance(regex_whitelist, str) else regex_whitelist
+        self.regex_whitelist = regex_whitelist
+        if regex_blacklist is not None:
+            regex_blacklist = (regex_blacklist,) if isinstance(regex_blacklist, str) else regex_blacklist
+        self.regex_blacklist = regex_blacklist
 
     async def before_request(self, entry):
-        if self.whitelist_regex is not None:
-            if not re.search(self.whitelist_regex, entry.request.url):
-                raise RejectRequest("Request URL %s is not in whitelist patterns" % entry.request.url)
-        elif self.blacklist_regex is not None:
-            if re.search(self.blacklist_regex, entry.request.url):
-                raise RejectRequest("Request URL %s is in blacklist patterns" % entry.request.url)
+        if self.regex_whitelist:
+            for regex in self.regex_whitelist:
+                if re.search(regex, entry.request.url):
+                    return
+            raise RejectRequest("Request URL %s is not in whitelist patterns" % entry.request.url)
+        elif self.regex_blacklist:
+            for regex in self.regex_blacklist:
+                if re.search(regex, entry.request.url):
+                    raise RejectRequest("Request URL %s is in blacklist patterns" % entry.request.url)

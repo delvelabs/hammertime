@@ -17,6 +17,7 @@
 
 
 from unittest import TestCase
+import re
 
 from hammertime.rules import FilterRequestFromURL
 from hammertime.http import Entry
@@ -31,8 +32,8 @@ class TestFilterRequestFromURL(TestCase):
 
     @async_test()
     async def test_before_request_reject_request_not_matching_whitelist_regex(self):
-        whitelist_regex = "http://(?:\w+\.)*example.com"
-        filter = FilterRequestFromURL(whitelist_regex=whitelist_regex)
+        regex = "http://(?:\w+\.)*example\.com"
+        filter = FilterRequestFromURL(regex_whitelist=regex)
         entry = Entry.create("http://external-website.com/")
 
         with self.assertRaises(RejectRequest):
@@ -40,8 +41,8 @@ class TestFilterRequestFromURL(TestCase):
 
     @async_test()
     async def test_before_request_allow_request_matching_whitelist_regex(self):
-        whitelist_regex = "(?:\w+\.)*example.com"
-        filter = FilterRequestFromURL(whitelist_regex=whitelist_regex)
+        regex = "(?:\w+\.)*example\.com"
+        filter = FilterRequestFromURL(regex_whitelist=regex)
         urls = ["http://www.example.com/", "https://example.com/", "http://example.com", "http://svn.example.com/",
                 "https://server.example.com/config.php"]
 
@@ -54,9 +55,47 @@ class TestFilterRequestFromURL(TestCase):
 
     @async_test()
     async def test_before_request_reject_request_matching_blacklist_regex(self):
-        blacklist_regex = "(?:\w+\.)*dont-touch-this-server.com"
-        filter = FilterRequestFromURL(blacklist_regex=blacklist_regex)
+        regex = "(?:\w+\.)*dont-touch-this-server\.com"
+        filter = FilterRequestFromURL(regex_blacklist=regex)
         entry = Entry.create("http://www.dont-touch-this-server.com/")
 
         with self.assertRaises(RejectRequest):
             await filter.before_request(entry)
+
+    @async_test()
+    async def test_before_request_works_with_iterable_for_whitelist(self):
+        regex_list = ["www.example.com", "dev.example.com", "test.example.com", "//example.com"]
+        ok_urls = ["http://www.example.com/", "https://example.com/", "http://example.com",
+                   "https://dev.example.com/index.html", "http://1.test.example.com/abc.php"]
+        bad_urls = ["http://svn.example.com/", "https://server.example.com/config.php", "https://abc.example.com/"]
+        regex_list = [re.escape(string) for string in regex_list]
+        filter = FilterRequestFromURL(regex_whitelist=regex_list)
+
+        for url in bad_urls:
+            with self.assertRaises(RejectRequest):
+                await filter.before_request(Entry.create(url))
+
+        try:
+            for url in ok_urls:
+                await filter.before_request(Entry.create(url))
+        except RejectRequest as e:
+            self.fail(str(e))
+
+    @async_test()
+    async def test_before_request_works_with_iterable_for_blacklist(self):
+        regex_list = ["server.example.com", "abc.example.com", "svn.example.com"]
+        ok_urls = ["http://www.example.com/", "https://example.com/", "http://example.com",
+                   "https://dev.example.com/index.html", "http://1.test.example.com/abc.php"]
+        bad_urls = ["http://svn.example.com/", "https://server.example.com/config.php", "https://abc.example.com/"]
+        regex_list = [re.escape(string) for string in regex_list]
+        filter = FilterRequestFromURL(regex_blacklist=regex_list)
+
+        for url in bad_urls:
+            with self.assertRaises(RejectRequest):
+                await filter.before_request(Entry.create(url))
+
+        try:
+            for url in ok_urls:
+                await filter.before_request(Entry.create(url))
+        except RejectRequest as e:
+            self.fail(str(e))
