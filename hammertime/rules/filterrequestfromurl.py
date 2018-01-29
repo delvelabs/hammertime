@@ -24,6 +24,10 @@ from hammertime.ruleset import RejectRequest
 class FilterRequestFromURL:
 
     def __init__(self, *, regex_whitelist=None, regex_blacklist=None):
+        if regex_blacklist is None and regex_whitelist is None:
+            raise ValueError("Need a regex white list or a regex black list.")
+        if regex_whitelist is not None and regex_blacklist is not None:
+            raise ValueError("Cannot use both a white list and a black list.")
         if regex_whitelist is not None:
             regex_whitelist = (regex_whitelist,) if isinstance(regex_whitelist, str) else regex_whitelist
         self.regex_whitelist = regex_whitelist

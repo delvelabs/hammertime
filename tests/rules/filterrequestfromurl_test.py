@@ -99,3 +99,11 @@ class TestFilterRequestFromURL(TestCase):
                 await filter.before_request(Entry.create(url))
         except RejectRequest as e:
             self.fail(str(e))
+
+    def test_constructor_raise_value_error_if_both_regex_list_are_none(self):
+        with self.assertRaises(ValueError):
+            FilterRequestFromURL(regex_whitelist=None, regex_blacklist=None)
+
+    def test_constructor_raise_value_error_if_both_regex_list_are_set(self):
+        with self.assertRaises(ValueError):
+            FilterRequestFromURL(regex_whitelist="example\.com", regex_blacklist="test\.com")
