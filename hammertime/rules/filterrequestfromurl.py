@@ -60,7 +60,7 @@ class FilterRequestFromURL:
             url = "//" + url  # without this 'example.com/index.html' is seen as a relative path.
         parsed_url = urlparse(url)
         if len(parsed_url.netloc) > 0:
-            filter["netloc"] = parsed_url.netloc
+            filter["host"] = parsed_url.netloc
         if len(parsed_url.path) > 0:
             filter["path"] = parsed_url.path
         return filter
@@ -74,6 +74,10 @@ class FilterRequestFromURL:
 
     def _apply_filter(self, parsed_url, filter):
         for key in filter.keys():
-            if filter[key] != getattr(parsed_url, key):
-                return False
+            if key == "host":
+                if filter[key] != parsed_url.netloc:
+                    return False
+            elif key == "path":
+                if not parsed_url.path.startswith(filter[key]):
+                    return False
         return True
