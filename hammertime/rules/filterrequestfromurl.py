@@ -60,39 +60,20 @@ class FilterRequestFromURL:
             url = "//" + url  # without this 'example.com/index.html' is seen as a relative path.
         parsed_url = urlparse(url)
         if len(parsed_url.netloc) > 0:
-            filter["domain"] = self._split_domain_in_parts(parsed_url.netloc)
+            filter["netloc"] = parsed_url.netloc
         if len(parsed_url.path) > 0:
-            filter["path"] = self._split_path_in_parts(parsed_url.path)
+            filter["path"] = parsed_url.path
         return filter
-
-    def _split_domain_in_parts(self, domain):
-        return [part for part in reversed(domain.split(".")) if len(part) > 0]
-
-    def _split_path_in_parts(self, path):
-        return [part for part in path.split("/") if len(part) > 0]
 
     def _match_found(self, url, filter_list):
         parsed = urlparse(url)
         for filter in filter_list:
-            domain_match = False
-            path_match = False
-            if "domain" in filter:
-                netloc = self._split_domain_in_parts(parsed.netloc)
-                domain_match = self._contains(filter["domain"], netloc)
-            if "path" in filter:
-                path = self._split_path_in_parts(parsed.path)
-                path_match = self._contains(filter["path"], path)
-            if "domain" in filter and "path" in filter:
-                if domain_match and path_match:
-                    return True
-            elif domain_match or path_match:
+            if self._apply_filter(parsed, filter):
                 return True
         return False
 
-    def _contains(self, container_parts, contained_parts):
-        if len(container_parts) > len(contained_parts):
-            return False
-        for i in range(len(container_parts)):
-            if container_parts[i] != contained_parts[i]:
+    def _apply_filter(self, parsed_url, filter):
+        for key in filter.keys():
+            if filter[key] != getattr(parsed_url, key):
                 return False
         return True
