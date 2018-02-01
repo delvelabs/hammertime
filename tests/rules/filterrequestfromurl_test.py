@@ -84,7 +84,8 @@ class TestFilterRequestFromURL(TestCase):
     async def test_before_request_works_with_iterable_for_forbidden_domain(self):
         domain_list = ["server.example.com", "abc.example.com", "svn.example.com"]
         ok_urls = ["http://www.example.com/", "https://example.com/", "http://example.com",
-                   "https://dev.example.com/index.html", "http://1.test.example.com/abc.php"]
+                   "https://dev.example.com/index.html", "http://1.test.example.com/abc.php",
+                   "http://abc.example.com.test"]
         bad_urls = ["http://svn.example.com/", "https://server.example.com/config.php", "https://abc.example.com/"]
         filter = FilterRequestFromURL(forbidden_domain=domain_list)
 

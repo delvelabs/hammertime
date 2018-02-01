@@ -63,11 +63,14 @@ class FilterRequestFromURL:
     def _match_found(self, netloc, domain_list):
         parsed = self._split_domain_in_parts(netloc)
         for domain_parts in domain_list:
-            if len(domain_parts) > len(parsed):
-                continue
-            for i in range(len(domain_parts)):
-                if domain_parts[i] != parsed[i]:
-                    break
-            else:
+            if self._domain_contains(domain_parts, parsed):
                 return True
         return False
+
+    def _domain_contains(self, container_domain_parts, contained_domain_parts):
+        if len(container_domain_parts) > len(contained_domain_parts):
+            return False
+        for i in range(len(container_domain_parts)):
+            if container_domain_parts[i] != contained_domain_parts[i]:
+                return False
+        return True
