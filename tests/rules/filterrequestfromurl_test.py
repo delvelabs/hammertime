@@ -17,7 +17,6 @@
 
 
 from unittest import TestCase
-import re
 
 from hammertime.rules import FilterRequestFromURL
 from hammertime.http import Entry
@@ -50,6 +49,46 @@ class TestFilterRequestFromURL(TestCase):
             for url in urls:
                 entry = Entry.create(url)
                 await filter.before_request(entry)
+        except RejectRequest as e:
+            self.fail(str(e))
+
+    @async_test()
+    async def test_before_request_reject_request_with_url_not_in_allowed_path(self):
+        path = "/allowed"
+        filter = FilterRequestFromURL(allowed_domain=path)
+        entry = Entry.create("http://example.com/test")
+
+        with self.assertRaises(RejectRequest):
+            await filter.before_request(entry)
+
+    @async_test()
+    async def test_before_request_allow_request_with_url_in_allowed_path(self):
+        path = "/allowed"
+        filter = FilterRequestFromURL(allowed_domain=path)
+        entry = Entry.create("http://example.com/allowed/file.html")
+
+        try:
+            await filter.before_request(entry)
+        except RejectRequest as e:
+            self.fail(str(e))
+
+    @async_test()
+    async def test_before_request_reject_request_with_path_in_forbidden_path(self):
+        path = "/forbidden"
+        filter = FilterRequestFromURL(forbidden_domain=path)
+        entry = Entry.create("http://example.com/forbidden/.htaccess")
+
+        with self.assertRaises(RejectRequest):
+            await filter.before_request(entry)
+
+    @async_test()
+    async def test_before_request_allow_request_with_path_not_in_forbidden_path(self):
+        path = "/forbidden"
+        filter = FilterRequestFromURL(forbidden_domain=path)
+        entry = Entry.create("http://example.com/test/file.html")
+
+        try:
+            await filter.before_request(entry)
         except RejectRequest as e:
             self.fail(str(e))
 
@@ -98,6 +137,66 @@ class TestFilterRequestFromURL(TestCase):
                 await filter.before_request(Entry.create(url))
         except RejectRequest as e:
             self.fail(str(e))
+
+    @async_test()
+    async def test_before_request_reject_request_with_path_and_domain_in_forbidden_url(self):
+        domain = "example.com/test"
+        filter = FilterRequestFromURL(forbidden_domain=domain)
+        entry = Entry.create("http://www.example.com/test/index.html")
+
+        with self.assertRaises(RejectRequest):
+            await filter.before_request(entry)
+
+    @async_test()
+    async def test_before_request_allow_request_with_path_in_forbidden_url_but_not_domain(self):
+        domain = "example.com/forbidden"
+        filter = FilterRequestFromURL(forbidden_domain=domain)
+        entry = Entry.create("http://www.forbidden.com/forbidden/index.html")
+
+        try:
+            await filter.before_request(entry)
+        except RejectRequest as e:
+            self.fail(str(e))
+
+    @async_test()
+    async def test_before_request_allow_request_with_domain_in_forbidden_url_but_not_path(self):
+        domain = "forbidden.com/test"
+        filter = FilterRequestFromURL(forbidden_domain=domain)
+        entry = Entry.create("http://www.forbidden.com/allowed/index.html")
+
+        try:
+            await filter.before_request(entry)
+        except RejectRequest as e:
+            self.fail(str(e))
+
+    @async_test()
+    async def test_before_request_allow_request_with_path_and_domain_in_allowed_url(self):
+        domain = "example.com/test"
+        filter = FilterRequestFromURL(allowed_domain=domain)
+        entry = Entry.create("http://www.example.com/test/index.html")
+
+        try:
+            await filter.before_request(entry)
+        except RejectRequest as e:
+            self.fail(str(e))
+
+    @async_test()
+    async def test_before_request_reject_request_with_path_in_allowed_url_but_not_domain(self):
+        domain = "example.com/test"
+        filter = FilterRequestFromURL(allowed_domain=domain)
+        entry = Entry.create("http://www.test.com/test/index.html")
+
+        with self.assertRaises(RejectRequest):
+            await filter.before_request(entry)
+
+    @async_test()
+    async def test_before_request_reject_request_with_domain_in_allowed_url_but_not_path(self):
+        domain = "example.com/allowed"
+        filter = FilterRequestFromURL(allowed_domain=domain)
+        entry = Entry.create("http://www.test.com/test/index.html")
+
+        with self.assertRaises(RejectRequest):
+            await filter.before_request(entry)
 
     def test_constructor_raise_value_error_if_both_domain_list_are_none(self):
         with self.assertRaises(ValueError):
