@@ -159,16 +159,28 @@ Parameter:
 * threshold: The amount of timed out requests in a row required to declared the destination host as dead. Default is 50.
 
 
-**class hammertime.rules.FilterRequestFromURL(\*, regex_whitelist=None, regex_blacklist=None)**
+**class hammertime.rules.FilterRequestFromURL(\*, allowed_urls=None, forbidden_urls=None)**
 
-Reject requests based on the URL. URL of each request is match against one or more regex, either from *regex_whitelist* 
-or *regex_blacklist* (but not both), and a request with an URL that matches a regex in the black list or that doesn't 
-match a regex in the white list is rejected (a RejectRequest exception is raised). A ValueError is raised if both 
-parameters are either None or not None.
+Reject requests based on the URL. URL of each request is match against one or more url filter, either from 
+*allowed_urls* or *forbidden_urls* (but not both), and a request with an URL that matches a filter in the black list or 
+that doesn't match at least one filter in the white list is rejected (a RejectRequest exception is raised). The matching
+ rules are as follow:
+ 1. If the filter has a network location (example.com), and the URL network location is inside the filter's network 
+    location (www.example.com), the network locations match.
+ 2. If the filter has a path (/test), and the URL path is inside the filter's path (/test/index.html), the path match.
+ 3. If the filter contains both a network location and a path (example.com/test), the URL matches only if 1 and 2 
+    returned a match.
+ 4. Else, it returns a match if 1 or 2 returned a match.
+
+A ValueError is raised if both parameters are either None or not None.
 
 Parameter:
 
-* regex_whitelist: A string or a list of string with regex describing the allowed URLs for the requests, or None if the
-                   black list is used instead.
-* regex_blacklist: A string or a list of string with regex describing the forbidden URLs for the requests, or None if 
-                   white list is used instead.
+* allowed_urls: A string or a list of string with a network location and/or a path describing the allowed URLs for the 
+                requests, or None if the forbidden url list is used instead. Ex: "example.com" will match all URL
+                to this domain and its subdomain, "/test" will match all URL with a path beginning with /test, and 
+                "example.com/test" will match all URL in this domain and its subdomain only if their paths begin with
+                /test.
+* forbidden_urls: A string or a list of string with a network location and/or a path describing the forbidden URLs for 
+                  the requests, or None if the allowed url list is used instead. Matching rules are the same as the 
+                  allowed_urls.
