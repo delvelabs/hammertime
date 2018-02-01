@@ -46,7 +46,7 @@ class FilterRequestFromURL:
 
     def _to_iterable(self, regex_list):
         if isinstance(regex_list, str):
-            return regex_list,
+            return (regex_list,)
         return regex_list
 
     def _match_found(self, url, regex_list):
