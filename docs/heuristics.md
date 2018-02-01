@@ -157,3 +157,18 @@ Raise OfflineHostException if the destination host is or become unresponsive. A 
 Parameter:
 
 * threshold: The amount of timed out requests in a row required to declared the destination host as dead. Default is 50.
+
+
+**class hammertime.rules.FilterRequestFromURL(\*, regex_whitelist=None, regex_blacklist=None)**
+
+Reject requests based on the URL. URL of each request is match against one or more regex, either from *regex_whitelist* 
+or *regex_blacklist* (but not both), and a request with an URL that matches a regex in the black list or that doesn't 
+match a regex in the white list is rejected (a RejectRequest exception is raised). A ValueError is raised if both 
+parameters are either None or not None.
+
+Parameter:
+
+* regex_whitelist: A string or a list of string with regex describing the allowed URLs for the requests, or None if the
+                   black list is used instead.
+* regex_blacklist: A string or a list of string with regex describing the forbidden URLs for the requests, or None if 
+                   white list is used instead.
