@@ -31,18 +31,18 @@ class TestFilterRequestFromURL(TestCase):
         pass
 
     @async_test()
-    async def test_before_request_reject_request_not_matching_whitelist_regex(self):
-        regex = "http://(?:\w+\.)*example\.com"
-        filter = FilterRequestFromURL(regex_whitelist=regex)
-        entry = Entry.create("http://external-website.com/")
+    async def test_before_request_reject_request_with_url_not_in_allowed_domain(self):
+        domain = "example.com"
+        filter = FilterRequestFromURL(allowed_domain=domain)
+        entry = Entry.create("http://example.ca/")
 
         with self.assertRaises(RejectRequest):
             await filter.before_request(entry)
 
     @async_test()
-    async def test_before_request_allow_request_matching_whitelist_regex(self):
-        regex = "(?:\w+\.)*example\.com"
-        filter = FilterRequestFromURL(regex_whitelist=regex)
+    async def test_before_request_allow_request_with_url_in_allowed_domain(self):
+        domain = "example.com"
+        filter = FilterRequestFromURL(allowed_domain=domain)
         urls = ["http://www.example.com/", "https://example.com/", "http://example.com", "http://svn.example.com/",
                 "https://server.example.com/config.php"]
 
@@ -54,22 +54,21 @@ class TestFilterRequestFromURL(TestCase):
             self.fail(str(e))
 
     @async_test()
-    async def test_before_request_reject_request_matching_blacklist_regex(self):
-        regex = "(?:\w+\.)*dont-touch-this-server\.com"
-        filter = FilterRequestFromURL(regex_blacklist=regex)
-        entry = Entry.create("http://www.dont-touch-this-server.com/")
+    async def test_before_request_reject_request_with_url_in_forbidden_domain(self):
+        domain = "forbidden.com"
+        filter = FilterRequestFromURL(forbidden_domain=domain)
+        entry = Entry.create("http://www.forbidden.com/")
 
         with self.assertRaises(RejectRequest):
             await filter.before_request(entry)
 
     @async_test()
-    async def test_before_request_works_with_iterable_for_whitelist(self):
-        regex_list = ["www.example.com", "dev.example.com", "test.example.com", "//example.com"]
-        ok_urls = ["http://www.example.com/", "https://example.com/", "http://example.com",
-                   "https://dev.example.com/index.html", "http://1.test.example.com/abc.php"]
-        bad_urls = ["http://svn.example.com/", "https://server.example.com/config.php", "https://abc.example.com/"]
-        regex_list = [re.escape(string) for string in regex_list]
-        filter = FilterRequestFromURL(regex_whitelist=regex_list)
+    async def test_before_request_works_with_iterable_for_allowed_domain(self):
+        domain_list = ["www.example.com", "dev.example.com", "test.example.com"]
+        ok_urls = ["http://www.example.com/", "https://dev.example.com/index.html", "http://1.test.example.com/abc.php"]
+        bad_urls = ["http://svn.example.com/", "https://server.example.com/config.php", "https://abc.example.com/",
+                    "http://example.com/", "http://www.example.com.unrelated-domain.test/"]
+        filter = FilterRequestFromURL(allowed_domain=domain_list)
 
         for url in bad_urls:
             with self.assertRaises(RejectRequest):
@@ -82,13 +81,12 @@ class TestFilterRequestFromURL(TestCase):
             self.fail(str(e))
 
     @async_test()
-    async def test_before_request_works_with_iterable_for_blacklist(self):
-        regex_list = ["server.example.com", "abc.example.com", "svn.example.com"]
+    async def test_before_request_works_with_iterable_for_forbidden_domain(self):
+        domain_list = ["server.example.com", "abc.example.com", "svn.example.com"]
         ok_urls = ["http://www.example.com/", "https://example.com/", "http://example.com",
                    "https://dev.example.com/index.html", "http://1.test.example.com/abc.php"]
         bad_urls = ["http://svn.example.com/", "https://server.example.com/config.php", "https://abc.example.com/"]
-        regex_list = [re.escape(string) for string in regex_list]
-        filter = FilterRequestFromURL(regex_blacklist=regex_list)
+        filter = FilterRequestFromURL(forbidden_domain=domain_list)
 
         for url in bad_urls:
             with self.assertRaises(RejectRequest):
@@ -100,10 +98,10 @@ class TestFilterRequestFromURL(TestCase):
         except RejectRequest as e:
             self.fail(str(e))
 
-    def test_constructor_raise_value_error_if_both_regex_list_are_none(self):
+    def test_constructor_raise_value_error_if_both_domain_list_are_none(self):
         with self.assertRaises(ValueError):
-            FilterRequestFromURL(regex_whitelist=None, regex_blacklist=None)
+            FilterRequestFromURL(allowed_domain=None, forbidden_domain=None)
 
-    def test_constructor_raise_value_error_if_both_regex_list_are_set(self):
+    def test_constructor_raise_value_error_if_both_domain_list_are_set(self):
         with self.assertRaises(ValueError):
-            FilterRequestFromURL(regex_whitelist="example\.com", regex_blacklist="test\.com")
+            FilterRequestFromURL(allowed_domain="example.com", forbidden_domain="test.com")

@@ -17,40 +17,57 @@
 
 
 import re
+from urllib.parse import urlparse
 
 from hammertime.ruleset import RejectRequest
 
 
 class FilterRequestFromURL:
 
-    def __init__(self, *, regex_whitelist=None, regex_blacklist=None):
-        if regex_blacklist is None and regex_whitelist is None:
-            raise ValueError("Need a regex white list or a regex black list.")
-        if regex_whitelist is not None and regex_blacklist is not None:
+    def __init__(self, *, allowed_domain=None, forbidden_domain=None):
+        if forbidden_domain is None and allowed_domain is None:
+            raise ValueError("Need a domain white list or a domain black list.")
+        if allowed_domain is not None and forbidden_domain is not None:
             raise ValueError("Cannot use both a white list and a black list.")
-        if regex_whitelist is not None:
-            regex_whitelist = self._to_iterable(regex_whitelist)
-        self.regex_whitelist = regex_whitelist
-        if regex_blacklist is not None:
-            regex_blacklist = self._to_iterable(regex_blacklist)
-        self.regex_blacklist = regex_blacklist
+        if allowed_domain is not None:
+            allowed_domain = self._parse_domain_list(allowed_domain)
+        self.allowed_domain = allowed_domain
+        if forbidden_domain is not None:
+            forbidden_domain = self._parse_domain_list(forbidden_domain)
+        self.forbidden_domain = forbidden_domain
 
     async def before_request(self, entry):
-        url = entry.request.url
-        if self.regex_whitelist:
-            if not self._match_found(url, self.regex_whitelist):
-                raise RejectRequest("Request URL %s is not in whitelist patterns" % url)
-        elif self.regex_blacklist:
-            if self._match_found(url, self.regex_blacklist):
-                raise RejectRequest("Request URL %s is in blacklist patterns" % url)
+        url = urlparse(entry.request.url)
+        if self.allowed_domain:
+            if not self._match_found(url.netloc, self.allowed_domain):
+                raise RejectRequest("Request URL %s is not in whitelist patterns" % url.geturl())
+        elif self.forbidden_domain:
+            if self._match_found(url.netloc, self.forbidden_domain):
+                raise RejectRequest("Request URL %s is in blacklist patterns" % url.geturl())
 
-    def _to_iterable(self, regex_list):
-        if isinstance(regex_list, str):
-            return (regex_list,)
-        return regex_list
+    def _parse_domain_list(self, domain_list):
+        if isinstance(domain_list, str):
+            return [self._split_domain_in_parts(domain_list)]
+        else:
+            parsed = []
+            for domain in domain_list:
+                parsed.append(self._split_domain_in_parts(domain))
+        return parsed
 
-    def _match_found(self, url, regex_list):
-        for regex in regex_list:
-            if re.search(regex, url):
+    def _split_domain_in_parts(self, domain):
+        parts = []
+        for part in reversed(domain.split(".")):
+            parts.append(part)
+        return parts
+
+    def _match_found(self, netloc, domain_list):
+        parsed = self._split_domain_in_parts(netloc)
+        for domain_parts in domain_list:
+            if len(domain_parts) > len(parsed):
+                continue
+            for i in range(len(domain_parts)):
+                if domain_parts[i] != parsed[i]:
+                    break
+            else:
                 return True
         return False
