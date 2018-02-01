@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-import re
 from urllib.parse import urlparse
 
 from hammertime.ruleset import RejectRequest
@@ -24,26 +23,28 @@ from hammertime.ruleset import RejectRequest
 
 class FilterRequestFromURL:
 
-    def __init__(self, *, allowed_domain=None, forbidden_domain=None):
-        if forbidden_domain is None and allowed_domain is None:
-            raise ValueError("Need a domain white list or a domain black list.")
-        if allowed_domain is not None and forbidden_domain is not None:
+    def __init__(self, *, allowed_urls=None, forbidden_urls=None):
+        if forbidden_urls is None and allowed_urls is None:
+            raise ValueError("Need an URL white list or an URL black list.")
+        if allowed_urls is not None and forbidden_urls is not None:
             raise ValueError("Cannot use both a white list and a black list.")
-        if allowed_domain is not None:
-            allowed_domain = self._parse_url_list(allowed_domain)
-        self.allowed_domain = allowed_domain
-        if forbidden_domain is not None:
-            forbidden_domain = self._parse_url_list(forbidden_domain)
-        self.forbidden_domain = forbidden_domain
+
+        if allowed_urls is not None:
+            allowed_urls = self._parse_url_list(allowed_urls)
+        self.allowed_filters = allowed_urls
+
+        if forbidden_urls is not None:
+            forbidden_urls = self._parse_url_list(forbidden_urls)
+        self.forbidden_filters = forbidden_urls
 
     async def before_request(self, entry):
         url = entry.request.url
-        if self.allowed_domain:
-            if not self._match_found(url, self.allowed_domain):
-                raise RejectRequest("Request URL %s is not in whitelist patterns" % url)
-        elif self.forbidden_domain:
-            if self._match_found(url, self.forbidden_domain):
-                raise RejectRequest("Request URL %s is in blacklist patterns" % url)
+        if self.allowed_filters:
+            if not self._match_found(url, self.allowed_filters):
+                raise RejectRequest("Request URL %s is not in URL whitelist" % url)
+        elif self.forbidden_filters:
+            if self._match_found(url, self.forbidden_filters):
+                raise RejectRequest("Request URL %s is in URL blacklist" % url)
 
     def _parse_url_list(self, urls):
         if isinstance(urls, str):
@@ -56,7 +57,7 @@ class FilterRequestFromURL:
     def _parse_url(self, url):
         filter = {}
         if "//" not in url and url[0] != "/":
-            url = "//" + url  # without this example.com/index.html is seen as a relative path.
+            url = "//" + url  # without this 'example.com/index.html' is seen as a relative path.
         parsed_url = urlparse(url)
         if len(parsed_url.netloc) > 0:
             filter["domain"] = self._split_domain_in_parts(parsed_url.netloc)
@@ -65,10 +66,7 @@ class FilterRequestFromURL:
         return filter
 
     def _split_domain_in_parts(self, domain):
-        parts = []
-        for part in reversed(domain.split(".")):
-            parts.append(part)
-        return parts
+        return [part for part in reversed(domain.split(".")) if len(part) > 0]
 
     def _split_path_in_parts(self, path):
         return [part for part in path.split("/") if len(part) > 0]
@@ -80,12 +78,10 @@ class FilterRequestFromURL:
             path_match = False
             if "domain" in filter:
                 netloc = self._split_domain_in_parts(parsed.netloc)
-                if self._domain_contains(filter["domain"], netloc):
-                    domain_match = True
+                domain_match = self._contains(filter["domain"], netloc)
             if "path" in filter:
                 path = self._split_path_in_parts(parsed.path)
-                if self._path_contains(filter["path"], path):
-                    path_match = True
+                path_match = self._contains(filter["path"], path)
             if "domain" in filter and "path" in filter:
                 if domain_match and path_match:
                     return True
@@ -93,18 +89,10 @@ class FilterRequestFromURL:
                 return True
         return False
 
-    def _domain_contains(self, container_domain_parts, contained_domain_parts):
-        if len(container_domain_parts) > len(contained_domain_parts):
+    def _contains(self, container_parts, contained_parts):
+        if len(container_parts) > len(contained_parts):
             return False
-        for i in range(len(container_domain_parts)):
-            if container_domain_parts[i] != contained_domain_parts[i]:
-                return False
-        return True
-
-    def _path_contains(self, container_path_parts, contained_path_parts):
-        if len(container_path_parts) > len(contained_path_parts):
-            return False
-        for i in range(len(container_path_parts)):
-            if container_path_parts[i] != contained_path_parts[i]:
+        for i in range(len(container_parts)):
+            if container_parts[i] != contained_parts[i]:
                 return False
         return True
