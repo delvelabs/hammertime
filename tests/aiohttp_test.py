@@ -51,14 +51,16 @@ class TestAioHttpEngine(TestCase):
 
         self.assertEqual(engine.proxy, proxy_address)
 
-    def test_constructor_create_client_session_with_connector_with_specified_verify_ssl_value(self):
+    @async_test()
+    async def test_constructor_create_client_session_with_connector_with_specified_verify_ssl_value(self):
         engine_verify_ssl = AioHttpEngine(loop=None, verify_ssl=True)
         engine_dont_verify_ssl = AioHttpEngine(loop=None, verify_ssl=False)
 
         self.assertTrue(engine_verify_ssl.session.connector.verify_ssl)
         self.assertFalse(engine_dont_verify_ssl.session.connector.verify_ssl)
 
-    def test_constructor_load_certification_authority_certificate_in_session_ssl_context(self):
+    @async_test()
+    async def test_constructor_load_certification_authority_certificate_in_session_ssl_context(self):
         with patch("ssl.SSLContext.load_verify_locations", MagicMock()):
             engine = AioHttpEngine(loop=None, ca_certificate_file="certificate.cer")
 

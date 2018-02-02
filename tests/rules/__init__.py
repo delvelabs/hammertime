@@ -15,25 +15,5 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .body import IgnoreLargeBody
-from .header import SetHeader
-from .status import RejectStatusCode, DetectSoft404
-from .timeout import DynamicTimeout
-from .redirects import FollowRedirects
-from .deadhostdetection import DeadHostDetection
-from .behavior import DetectBehaviorChange, RejectErrorBehavior
-from .filterrequestfromurl import FilterRequestFromURL
 
-
-__all__ = [
-    DeadHostDetection,
-    DetectBehaviorChange,
-    DetectSoft404,
-    DynamicTimeout,
-    FilterRequestFromURL,
-    FollowRedirects,
-    IgnoreLargeBody,
-    RejectErrorBehavior,
-    RejectStatusCode,
-    SetHeader,
-]
+# This file allows nosetests to find the tests in this subdirectory.
