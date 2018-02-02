@@ -33,10 +33,7 @@ class TestFilterRequestFromURL(TestCase):
     async def test_before_request_allow_request_to_host_matching_filter_in_whitelist(self):
         filter = FilterRequestFromURL(allowed_urls="example.com")
 
-        try:
-            await filter.before_request(Entry.create("http://example.com/"))
-        except RejectRequest as e:
-            self.fail(str(e))
+        await filter.before_request(Entry.create("http://example.com/"))
 
     @async_test()
     async def test_before_request_reject_request_to_host_not_matching_filter_in_whitelist(self):
@@ -55,19 +52,13 @@ class TestFilterRequestFromURL(TestCase):
             with self.assertRaises(RejectRequest):
                 await filter.before_request(Entry.create(url))
         for url in good_urls:
-            try:
-                await filter.before_request(Entry.create(url))
-            except RejectRequest as e:
-                self.fail(str(e))
+            await filter.before_request(Entry.create(url))
 
     @async_test()
     async def test_before_request_allow_request_to_path_matching_filter_in_whitelist(self):
         filter = FilterRequestFromURL(allowed_urls="/allowed")
 
-        try:
-            await filter.before_request(Entry.create("http://example.com/allowed/index.html"))
-        except RejectRequest as e:
-            self.fail(str(e))
+        await filter.before_request(Entry.create("http://example.com/allowed/index.html"))
 
     @async_test()
     async def test_before_request_reject_request_to_path_not_matching_filter_in_whitelist(self):
@@ -89,19 +80,13 @@ class TestFilterRequestFromURL(TestCase):
     async def test_before_request_allow_request_to_path_and_host_matching_filter_in_whitelist(self):
         filter = FilterRequestFromURL(allowed_urls="example.com/allowed")
 
-        try:
-            await filter.before_request(Entry.create("http://example.com/allowed/index.html"))
-        except RejectRequest as e:
-            self.fail(str(e))
+        await filter.before_request(Entry.create("http://example.com/allowed/index.html"))
 
     @async_test()
     async def test_before_request_allow_request_to_host_not_matching_filter_in_blacklist(self):
         filter = FilterRequestFromURL(forbidden_urls="example.com")
 
-        try:
-            await filter.before_request(Entry.create("http://example.ca/"))
-        except RejectRequest as e:
-            self.fail(str(e))
+        await filter.before_request(Entry.create("http://example.ca/"))
 
     @async_test()
     async def test_before_request_reject_request_to_host_matching_filter_in_blacklist(self):
@@ -120,19 +105,13 @@ class TestFilterRequestFromURL(TestCase):
             with self.assertRaises(RejectRequest):
                 await filter.before_request(Entry.create(url))
         for url in good_urls:
-            try:
-                await filter.before_request(Entry.create(url))
-            except RejectRequest as e:
-                self.fail(str(e))
+            await filter.before_request(Entry.create(url))
 
     @async_test()
     async def test_before_request_allow_request_to_path_not_matching_filter_in_blacklist(self):
         filter = FilterRequestFromURL(forbidden_urls="/forbidden")
 
-        try:
-            await filter.before_request(Entry.create("http://example.com/allowed/index.html"))
-        except RejectRequest as e:
-            self.fail(str(e))
+        await filter.before_request(Entry.create("http://example.com/allowed/index.html"))
 
     @async_test()
     async def test_before_request_reject_request_to_path_matching_filter_in_blacklist(self):
@@ -145,11 +124,8 @@ class TestFilterRequestFromURL(TestCase):
     async def test_before_request_allow_request_to_path_or_host_not_matching_filter_in_blacklist(self):
         filter = FilterRequestFromURL(forbidden_urls="example.com/forbidden")
 
-        try:
-            await filter.before_request(Entry.create("http://example.ca/forbidden/index.html"))
-            await filter.before_request(Entry.create("http://example.com/test/index.html"))
-        except RejectRequest as e:
-            self.fail(str(e))
+        await filter.before_request(Entry.create("http://example.ca/forbidden/index.html"))
+        await filter.before_request(Entry.create("http://example.com/test/index.html"))
 
     @async_test()
     async def test_before_request_reject_request_to_path_and_host_matching_filter_in_blacklist(self):
@@ -157,6 +133,13 @@ class TestFilterRequestFromURL(TestCase):
 
         with self.assertRaises(RejectRequest):
             await filter.before_request(Entry.create("http://example.com/forbidden/index.html"))
+
+    @async_test()
+    async def test_path_matching_only_apply_to_full_directory_name(self):
+        filter = FilterRequestFromURL(allowed_urls="example.com/allowed")
+
+        with self.assertRaises(RejectRequest):
+            await filter.before_request(Entry.create("http://example.com/allowed-test"))
 
     def test_constructor_raise_value_error_if_both_domain_list_are_none(self):
         with self.assertRaises(ValueError):

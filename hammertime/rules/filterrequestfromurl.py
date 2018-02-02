@@ -62,7 +62,7 @@ class FilterRequestFromURL:
         if len(parsed_url.netloc) > 0:
             filter["host"] = parsed_url.netloc
         if len(parsed_url.path) > 0:
-            filter["path"] = parsed_url.path
+            filter["path"] = [part for part in parsed_url.path.split("/") if len(part) > 0]
         return filter
 
     def _match_found(self, url, filter_list):
@@ -73,11 +73,22 @@ class FilterRequestFromURL:
         return False
 
     def _apply_filter(self, parsed_url, filter):
-        for key in filter.keys():
+        for key, value in filter.items():
             if key == "host":
-                if filter[key] != parsed_url.netloc:
+                if value != parsed_url.netloc:
                     return False
             elif key == "path":
-                if not parsed_url.path.startswith(filter[key]):
+                if not self._path_match(value, parsed_url.path):
                     return False
         return True
+
+    def _path_match(self, filter_path, url_path):
+        path_parts = [part for part in url_path.split("/") if len(part) > 0]
+        if len(path_parts) < len(filter_path):
+            return False
+        for i in range(len(filter_path)):
+            if filter_path[i] != path_parts[i]:
+                return False
+        return True
+
+
