@@ -28,49 +28,58 @@ from hammertime.ruleset import RejectRequest
 
 class TestRejectCatchAllRedirect(TestCase):
 
-    @async_test()
-    async def test_before_request_fetch_same_path_as_origin_request_with_random_filename(self):
-        reject = RejectCatchAllRedirect()
-        fake_engine = MagicMock()
-        fake_engine.perform_high_priority = make_mocked_coro(return_value=MagicMock())
-        reject.set_engine(fake_engine)
-        entry0 = Entry.create("http://example.com/admin/login.php")
-        entry1 = Entry.create("http://example.com/index.html")
-        entry2 = Entry.create("http://example.com/path/to/admin/login.php")
-
-        with patch("hammertime.rules.rejectredirects.uuid4", MagicMock(return_value="uuid")):
-            await reject.before_request(entry0)
-            await reject.before_request(entry1)
-            await reject.before_request(entry2)
-
-            self.assertRequested("http://example.com/admin/uuid", fake_engine.perform_high_priority, order=0)
-            self.assertRequested("http://example.com/uuid", fake_engine.perform_high_priority, order=1)
-            self.assertRequested("http://example.com/path/to/admin/uuid", fake_engine.perform_high_priority, order=2)
+    def setUp(self):
+        self.heuristic = RejectCatchAllRedirect()
+        self.host = "http://example.com"
+        self.fake_engine = MagicMock()
+        self.heuristic.set_engine(self.fake_engine)
 
     @async_test()
-    async def test_before_request_raise_reject_request_if_random_file_redirect_to_origin_request(self):
-        reject = RejectCatchAllRedirect()
-        fake_engine = MagicMock()
-        response = StaticResponse(302, {"location": "http://example.com/admin/login.php"}, b"content")
-        returned_entry = Entry.create("http://example.com/admin/uuid", response=response)
-        fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
-        reject.set_engine(fake_engine)
-        entry = Entry.create("http://example.com/admin/login.php")
+    async def test_after_headers_request_random_filename_in_same_path_as_initial_request_if_response_is_redirect(self):
+        self.fake_engine.perform_high_priority = make_mocked_coro(return_value=MagicMock())
+        entry0 = self.create_redirected_request("/admin/restricted-resource.php", redirected_to="/admin/login.php")
+        entry1 = self.create_redirected_request("/junkpath", redirected_to="/index.html")
+        entry2 = self.create_redirected_request("/path/to/admin/resource", redirected_to="/path/to/admin/login.php")
+
+        with patch("hammertime.rules.redirects.uuid4", MagicMock(return_value="uuid")):
+            await self.heuristic.after_headers(entry0)
+            await self.heuristic.after_headers(entry1)
+            await self.heuristic.after_headers(entry2)
+
+            self.assertRequested(self.host + "/admin/uuid", self.fake_engine.perform_high_priority, order=0)
+            self.assertRequested(self.host + "/uuid", self.fake_engine.perform_high_priority, order=1)
+            self.assertRequested(self.host + "/path/to/admin/uuid", self.fake_engine.perform_high_priority, order=2)
+
+    @async_test()
+    async def test_after_headers_doesnt_request_random_filename_if_response_is_not_redirect(self):
+        self.fake_engine.perform_high_priority = make_mocked_coro()
+        entry = Entry.create("http://example.com/junkpath", response=StaticResponse(404, {}, b"Not found"))
+
+        await self.heuristic.after_headers(entry)
+
+        self.fake_engine.perform_high_priority.assert_not_called()
+
+    @async_test()
+    async def test_after_headers_reject_request_if_request_for_random_file_has_same_redirect_as_initial_request(self):
+        inital_request = self.create_redirected_request("/admin/resource.php", redirected_to="/admin/login.php")
+        returned_entry = self.create_redirected_request("/admin/uuid", redirected_to="/admin/login.php")
+        self.fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
 
         with self.assertRaises(RejectRequest):
-            await reject.before_request(entry)
+            await self.heuristic.after_headers(inital_request)
 
     @async_test()
-    async def test_before_request_accept_request_if_random_file_not_redirected_to_origin_request(self):
-        reject = RejectCatchAllRedirect()
-        fake_engine = MagicMock()
-        response = StaticResponse(302, {"location": "http://example.com/catchAll.html"}, b"content")
-        returned_entry = Entry.create("http://example.com/admin/uuid", response=response)
-        fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
-        reject.set_engine(fake_engine)
-        entry = Entry.create("http://example.com/admin/login.php")
+    async def test_before_request_accept_request_if_random_file_not_redirected_to_same_path_as_initial_request(self):
+        initial_request = self.create_redirected_request("/admin/resource.php", redirected_to="/admin/login.php")
+        returned_entry = self.create_redirected_request("/admin/uuid", redirected_to="/catchAll.html")
+        self.fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
 
-        await reject.before_request(entry)
+        await self.heuristic.after_headers(initial_request)
+
+    def create_redirected_request(self, path, *, redirected_to):
+        headers = {"location": self.host + redirected_to}
+        response = StaticResponse(code=302, headers=headers, content=b"content")
+        return Entry.create(self.host + path, response=response)
 
     def assertRequested(self, url, request_method, order=None):
         requested = False

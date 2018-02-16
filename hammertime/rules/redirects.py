@@ -17,7 +17,8 @@
 
 
 from copy import copy
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
+from uuid import uuid4
 
 from hammertime.http import Entry
 from hammertime.ruleset import Heuristics, RejectRequest
@@ -66,3 +67,27 @@ class FollowRedirects:
         entry = await self.engine.perform(entry, self.child_heuristics)
         self.engine.stats.completed += 1
         return entry
+
+
+class RejectCatchAllRedirect:
+
+    def __init__(self):
+        self.engine = None
+
+    def set_engine(self, engine):
+        self.engine = engine
+
+    async def after_headers(self, entry):
+        if entry.response.code in valid_redirects and "location" in entry.response.headers:
+            url = entry.request.url
+            path = urlparse(url).path
+            path_parts = path.split("/")[:-1]
+            random_path = "/".join(path_parts) + "/" + str(uuid4())
+            _entry = await self.engine.perform_high_priority(Entry.create(urljoin(url, random_path)))
+            if _entry.response.code in valid_redirects:
+                try:
+                    redirect = _entry.response.headers["location"]
+                    if redirect == entry.response.headers["location"]:
+                        raise RejectRequest("%s redirected to a catch all redirect" % url)
+                except KeyError:
+                    pass

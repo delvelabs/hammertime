@@ -19,11 +19,10 @@ from .body import IgnoreLargeBody
 from .header import SetHeader
 from .status import RejectStatusCode, DetectSoft404
 from .timeout import DynamicTimeout
-from .redirects import FollowRedirects
+from .redirects import FollowRedirects, RejectCatchAllRedirect
 from .deadhostdetection import DeadHostDetection
 from .behavior import DetectBehaviorChange, RejectErrorBehavior
 from .filterrequestfromurl import FilterRequestFromURL
-from .rejectredirects import RejectCatchAllRedirect
 
 
 __all__ = [
