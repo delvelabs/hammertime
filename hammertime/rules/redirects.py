@@ -73,10 +73,14 @@ class RejectCatchAllRedirect:
 
     def __init__(self):
         self.engine = None
+        self.redirects = {}
         self.child_heuristics = Heuristics()
 
     def set_engine(self, engine):
         self.engine = engine
+
+    def set_kb(self, kb):
+        kb.redirects = self.redirects
 
     async def after_headers(self, entry):
         if entry.response.code in valid_redirects and "location" in entry.response.headers:
@@ -87,6 +91,7 @@ class RejectCatchAllRedirect:
             if _entry.response.code in valid_redirects:
                 try:
                     redirect = _entry.response.headers["location"]
+                    self._add_redirect_to_kb(url, redirect)
                     if redirect == entry.response.headers["location"]:
                         raise RejectRequest("%s redirected to a catch all redirect" % url)
                 except KeyError:
@@ -96,3 +101,11 @@ class RejectCatchAllRedirect:
         path_parts = base_path.split("/")[:-1]
         random_path = "/".join(path_parts) + "/" + str(uuid4())
         return random_path
+
+    def _add_redirect_to_kb(self, requested_url, redirect_url):
+        requested_path = urlparse(requested_url).path
+        path_parts = requested_path.split("/")[:-1]
+        path = "/".join(path_parts) + "/"
+        print(path)
+        if path not in self.redirects:
+            self.redirects[path] = redirect_url

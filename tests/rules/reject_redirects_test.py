@@ -24,6 +24,7 @@ from tests.fixtures import async_test
 from hammertime.rules import RejectCatchAllRedirect
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest
+from hammertime.kb import KnowledgeBase
 
 
 class TestRejectCatchAllRedirect(TestCase):
@@ -76,6 +77,25 @@ class TestRejectCatchAllRedirect(TestCase):
 
         await self.heuristic.after_headers(initial_request)
 
+    @async_test()
+    async def test_after_headers_add_request_response_to_knowledge_base(self):
+        returned_entry = self.create_redirected_request("/anything", redirected_to="/login.php")
+        self.fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
+        entry0 = self.create_redirected_request("/admin/restricted-resource.php", redirected_to="/login.php")
+        entry1 = self.create_redirected_request("/junkpath", redirected_to="/login.php")
+        entry2 = self.create_redirected_request("/path/to/admin/resource", redirected_to="/login.php")
+        kb = KnowledgeBase()
+        self.heuristic.set_kb(kb)
+
+        with patch("hammertime.rules.redirects.uuid4", MagicMock(return_value="uuid")):
+            await self.ignore_reject_request(self.heuristic.after_headers, entry0)
+            await self.ignore_reject_request(self.heuristic.after_headers, entry1)
+            await self.ignore_reject_request(self.heuristic.after_headers, entry2)
+
+            self.assertEqual(kb.redirects["/admin/"], "%s/login.php" % self.host)
+            self.assertEqual(kb.redirects["/"], "%s/login.php" % self.host)
+            self.assertEqual(kb.redirects["/path/to/admin/"], "%s/login.php" % self.host)
+
     def create_redirected_request(self, path, *, redirected_to):
         headers = {"location": self.host + redirected_to}
         response = StaticResponse(code=302, headers=headers, content=b"content")
@@ -94,3 +114,9 @@ class TestRejectCatchAllRedirect(TestCase):
                 requested = True
                 break
         self.assertTrue(requested)
+
+    async def ignore_reject_request(self, coro, arg):
+        try:
+            await coro(arg)
+        except RejectRequest:
+            pass
