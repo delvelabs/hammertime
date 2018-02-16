@@ -23,6 +23,7 @@ from .redirects import FollowRedirects
 from .deadhostdetection import DeadHostDetection
 from .behavior import DetectBehaviorChange, RejectErrorBehavior
 from .filterrequestfromurl import FilterRequestFromURL
+from .rejectredirects import RejectCatchAllRedirect
 
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     FilterRequestFromURL,
     FollowRedirects,
     IgnoreLargeBody,
+    RejectCatchAllRedirect,
     RejectErrorBehavior,
     RejectStatusCode,
     SetHeader,

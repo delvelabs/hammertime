@@ -35,6 +35,7 @@ class FollowRedirects:
 
     def set_engine(self, engine):
         self.engine = engine
+        self.child_heuristics.request_engine = engine
 
     async def on_request_successful(self, entry):
         status_code = entry.response.code
