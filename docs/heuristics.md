@@ -36,6 +36,25 @@ If both heuristic_a and heuristic_b support the same [event](create_heuristics.m
 the before_request method of heuristic_a will be called before the before_request method of heuristic_b.
 
 
+## Child heuristic
+
+Some heuristics make requests of their own and heuristics can be applied to the requests they make. Heuristics used by a
+ heuristic are called child heuristics. For proper configuration of the child heuristics, the parent heuristic must be 
+ added to HammerTime before the child heuristics are added to the parent, else an attribute error will be raised:
+ 
+```python
+from hammertime import HammerTime
+from hammertime.rules import DynamicTimeout, FollowRedirects
+
+
+hammertime = HammerTime(retry_count=3)
+
+follow_redirects = FollowRedirects()
+timeout = DynamicTimeout(1, 5)
+hammertime.heuristics.add_multiple([follow_redirects])
+follow_redirects.child_heuristics.add(timeout)
+```
+
 ## Existing Heuristics
 
 **class hammertime.rules.RejectStatusCode(\*args)**
@@ -92,6 +111,9 @@ soft_404_detection.child_heuristics.add(timeout)
 hammertime.heuristics.add_multiple((timeout, soft_404_detection))
 ```
 
+This heuristic supports [child heuristics](#child-heuristic).
+
+
 **class hammertime.rules.SetHeader(name, value)**
 
 Set the value of a field in the HTTP header of the requests.
@@ -116,6 +138,8 @@ for entry in entry.result.redirects:
 Parameters:
 
 * max_redirects: Maximum redirects the heuristic will follow for a request before rejecting the request. Default is 15.
+
+This heuristic supports [child heuristics](#child-heuristic).
 
 
 **class hammertime.rules.DetectBehaviorChange(buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, 
@@ -183,3 +207,14 @@ Parameter:
 * forbidden_urls: A string or a list of string with a network location (host) and/or a path describing the forbidden 
                   URLs for the requests, or None if the allowed url list is used instead. Matching rules are the same as
                    allowed_urls.
+
+
+**class hammertime.rules.RejectCatchAllRedirect()**
+
+This heuristic rejects the redirects that a host returned when an unexisting resource in a specific directory is 
+requested and allows the redirects for existing resource. Ex: a server hosts privileged resources in ```/admin/```. 
+Unauthenticated users are redirected to ```/login.php``` when they requests an existing resource in ```/admin/```. All 
+requests to unexisting resources are redirected to ```/404```. In this scenario, redirects to ```/404``` will be 
+rejected but redirects to ```/login.php``` won't.
+ 
+This heuristic supports [child heuristics](#child-heuristic).

@@ -33,6 +33,7 @@ class TestFollowRedirects(TestCase):
         self.engine = FakeEngine()
         self.rule = FollowRedirects(max_redirect=10)
         self.rule.set_engine(self.engine)
+        self.rule.child_heuristics = MagicMock()
         self.response = Response(code=302, headers={"location": "https://www.example.com/"})
         self.response.set_content(b"", at_eof=True)
         self.entry = Entry.create("http://example.com", response=self.response)

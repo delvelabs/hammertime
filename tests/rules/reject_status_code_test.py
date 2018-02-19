@@ -71,6 +71,7 @@ class DetectSoft404Test(TestCase):
         self.kb = KnowledgeBase()
         self.rule.set_kb(self.kb)
         self.patterns = ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]
+        self.rule.child_heuristics = MagicMock()
 
     @async_test()
     async def test_call_made_to_alternate_url_for_request_url_pattern(self):

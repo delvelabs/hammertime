@@ -45,6 +45,9 @@ class Heuristics:
         if "set_kb" in supported and self.kb is not None:
             heuristic.set_kb(self.kb)
 
+        if "set_child_heuristics" in supported:
+            heuristic.set_child_heuristics(Heuristics(request_engine=self.request_engine, kb=self.kb))
+
         for event in self.EVENTS:
             if event in supported:
                 self.rulesets[event].add(getattr(heuristic, event))

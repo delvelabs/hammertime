@@ -32,11 +32,12 @@ class FollowRedirects:
     def __init__(self, *, max_redirect=15):
         self.max_redirect = max_redirect
         self.engine = None
-        self.child_heuristics = Heuristics()
 
     def set_engine(self, engine):
         self.engine = engine
-        self.child_heuristics.request_engine = engine
+
+    def set_child_heuristics(self, heuristics):
+        self.child_heuristics = heuristics
 
     async def on_request_successful(self, entry):
         status_code = entry.response.code
@@ -74,14 +75,15 @@ class RejectCatchAllRedirect:
     def __init__(self):
         self.engine = None
         self.redirects = {}
-        self.child_heuristics = Heuristics()
 
     def set_engine(self, engine):
         self.engine = engine
-        self.child_heuristics.request_engine = engine
 
     def set_kb(self, kb):
         kb.redirects = self.redirects
+
+    def set_child_heuristics(self, heuristics):
+        self.child_heuristics = heuristics
 
     async def after_headers(self, entry):
         if entry.response.code in valid_redirects and "location" in entry.response.headers:

@@ -127,6 +127,15 @@ class HeuristicsTest(TestCase):
         self.assertEqual(a.engine_set, "NO")
         self.assertEqual(b.kb_set, "NO")
 
+    def test_init_child_heuristics_on_add(self):
+        h = Heuristics(kb="kb", request_engine="engine")
+        parent_heuristic = ParentHeuristic()
+
+        h.add(parent_heuristic)
+
+        self.assertEqual(parent_heuristic.child_heuristics.kb, "kb")
+        self.assertEqual(parent_heuristic.child_heuristics.request_engine, "engine")
+
 
 class HeuristicBad:
     pass
@@ -162,4 +171,13 @@ class HeuristicB:
         pass
 
     async def after_response(self, entry):
+        pass
+
+
+class ParentHeuristic:
+
+    def set_child_heuristics(self, heuristics):
+        self.child_heuristics = heuristics
+
+    async def before_request(self, entry):
         pass
