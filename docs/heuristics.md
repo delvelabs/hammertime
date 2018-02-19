@@ -183,3 +183,14 @@ Parameter:
 * forbidden_urls: A string or a list of string with a network location (host) and/or a path describing the forbidden 
                   URLs for the requests, or None if the allowed url list is used instead. Matching rules are the same as
                    allowed_urls.
+
+
+**class hammertime.rules.RejectCatchAllRedirect()**
+
+This heuristic rejects the redirects that a host returned when an unexisting resource in a specific directory is 
+requested and allows the redirects for existing resource. Ex: a server hosts privileged resources in ```/admin/```. 
+Unauthenticated users are redirected to ```/login.php``` when they requests an existing resource in ```/admin/```. All 
+requests to unexisting resources are redirected to ```/404```. In this scenario, redirects to ```/404``` will be 
+rejected but redirects to ```/login.php``` won't.
+ 
+This heuristic can have child heuristics (heuristics used by this heuristics when it does its own requests).
