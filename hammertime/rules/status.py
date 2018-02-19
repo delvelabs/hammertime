@@ -46,7 +46,6 @@ class DetectSoft404:
 
     def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4):
         self.engine = None
-        self.child_heuristics = Heuristics()
         self.performed = defaultdict(dict)
         self.soft_404_responses = defaultdict(dict)
         self.distance_threshold = distance_threshold
@@ -58,6 +57,9 @@ class DetectSoft404:
 
     def set_kb(self, kb):
         kb.soft_404_responses = self.soft_404_responses
+
+    def set_child_heuristics(self, heuristics):
+        self.child_heuristics = heuristics
 
     async def after_response(self, entry):
         soft_404_response = await self.get_soft_404_sample(entry.request.url)
