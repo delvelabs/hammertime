@@ -78,6 +78,7 @@ class RejectCatchAllRedirect:
 
     def set_engine(self, engine):
         self.engine = engine
+        self.child_heuristics.request_engine = engine
 
     def set_kb(self, kb):
         kb.redirects = self.redirects
@@ -88,8 +89,8 @@ class RejectCatchAllRedirect:
             redirect_for_request = self._to_absolute_url(url, entry.response.headers["location"])
             default_redirect_for_path = await self._get_default_redirect_for_path(self._get_path(url))
             if redirect_for_request == default_redirect_for_path:
-                raise RejectRequest("{request} redirected to {redirect}, a catch all redirect".format(
-                    request=url, redirect=default_redirect_for_path))
+                raise RejectRequest("Catch-all redirect rejected: {} redirected to {}".format(
+                    url, default_redirect_for_path))
 
     async def _get_default_redirect_for_path(self, path):
         if path in self.redirects:
