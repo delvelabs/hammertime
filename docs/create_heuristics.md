@@ -12,6 +12,8 @@ class MyHeuristic:
         
     def set_kb(self, kb):
     
+    def set_child_heuristics(self, heuristics):
+    
     async def before_request(self, entry):
     
     async def after_headers(self, entry):
@@ -29,8 +31,10 @@ class MyHeuristic:
 The class for your heuristic must support at least one of the [events](#events): before_request, after_headers,
 after_response, on_timeout, on_request_successful or on_host_unreachable.
 
-set_engine and set_kb are optional. set_engine allows your heuristic to have a reference to the retry engine of 
-HammerTime. set_kb allows your heuristic to store its data in the [knowledge base](#knowledge-base).
+set_engine, set_kb and set_child_heuristics are optional. set_engine allows your heuristic to have a reference to the 
+retry engine of HammerTime. set_kb allows your heuristic to store its data in the [knowledge base](#knowledge-base). 
+set_child_heuristics allows your heuristic to apply heuristics chosen by the user to the requests it makes (see 
+[child heuristics](#child-heuristics)).
 
 
 ## Events
@@ -70,3 +74,30 @@ def set_kb(self, kb):
 Assignment to already initialized attribute of the knowledge base will raise an AttributeError.
 Objects added to the knowledge base need to be serializable, as the knowledge base can be store to a file to be shared 
 between several HammerTime executions.
+
+## Child heuristics
+
+If an heuristic needs to make requests to gather further data (see [detect soft 404](heuristics.md#existing-heuristics) 
+for an example), it may need to apply some heuristics to the requests it makes (e.g rejecting 404s or adjusting the 
+timeout dynamically). To use child heuristics in your heuristic:
+```python
+
+class MyHeuristic:
+
+    async def before_request(self, entry):
+        #doing some stuff involving requests
+
+    def set_child_heuristics(self, heuristics):
+        self.child_heuristics = heuristics
+        
+
+h = HammerTime()
+my_heuristic = MyHeuristic()
+
+h.heuristics.add(my_heuristic)
+
+my_heuristic.child_heuristics.add(DynamicTimeout(1, 5))
+
+```
+
+Check the [section about child heuristics](heuristics.md#child-heuristic) for more details
