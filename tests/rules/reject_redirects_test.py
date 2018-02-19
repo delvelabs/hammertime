@@ -62,12 +62,22 @@ class TestRejectCatchAllRedirect(TestCase):
 
     @async_test()
     async def test_after_headers_reject_request_if_request_for_random_file_has_same_redirect_as_initial_request(self):
-        inital_request = self.create_redirected_request("/admin/resource.php", redirected_to="/admin/login.php")
+        initial_request = self.create_redirected_request("/admin/resource.php", redirected_to="/admin/login.php")
         returned_entry = self.create_redirected_request("/admin/uuid", redirected_to="/admin/login.php")
         self.fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
 
         with self.assertRaises(RejectRequest):
-            await self.heuristic.after_headers(inital_request)
+            await self.heuristic.after_headers(initial_request)
+
+    @async_test()
+    async def test_after_headers_transform_relative_location_to_absolute_location(self):
+        initial_request = self.create_redirected_request("/admin/resource.php", redirected_to="/admin/login.php",
+                                                         relative=True)
+        returned_entry = self.create_redirected_request("/admin/uuid", redirected_to="/admin/login.php")
+        self.fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
+
+        with self.assertRaises(RejectRequest):
+            await self.heuristic.after_headers(initial_request)
 
     @async_test()
     async def test_before_request_accept_request_if_random_file_not_redirected_to_same_path_as_initial_request(self):
@@ -79,11 +89,20 @@ class TestRejectCatchAllRedirect(TestCase):
 
     @async_test()
     async def test_after_headers_add_request_response_to_knowledge_base(self):
-        returned_entry = self.create_redirected_request("/anything", redirected_to="/login.php")
+        first_host = "http://example1.com"
+        returned_entry = self.create_redirected_request("/anything", relative=True, redirected_to="/login.php")
         self.fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
-        entry0 = self.create_redirected_request("/admin/restricted-resource.php", redirected_to="/login.php")
-        entry1 = self.create_redirected_request("/junkpath", redirected_to="/login.php")
-        entry2 = self.create_redirected_request("/path/to/admin/resource", redirected_to="/login.php")
+        entry0 = self.create_redirected_request("/admin/restricted-resource.php", host=first_host,
+                                                redirected_to="/login.php")
+        entry1 = self.create_redirected_request("/junkpath", host=first_host, redirected_to="/login.php")
+        entry2 = self.create_redirected_request("/path/to/admin/resource", host=first_host, redirected_to="/login.php")
+
+        second_host = "http://example2.com"
+        entry3 = self.create_redirected_request("/admin/restricted-resource.php", host=second_host,
+                                                redirected_to="/login.php")
+        entry4 = self.create_redirected_request("/junkpath/", host=second_host, redirected_to="/login.php")
+        entry5 = self.create_redirected_request("/path/to/admin/resource", host=second_host, redirected_to="/login.php")
+
         kb = KnowledgeBase()
         self.heuristic.set_kb(kb)
 
@@ -91,15 +110,38 @@ class TestRejectCatchAllRedirect(TestCase):
             await self.ignore_reject_request(self.heuristic.after_headers, entry0)
             await self.ignore_reject_request(self.heuristic.after_headers, entry1)
             await self.ignore_reject_request(self.heuristic.after_headers, entry2)
+            await self.ignore_reject_request(self.heuristic.after_headers, entry3)
+            await self.ignore_reject_request(self.heuristic.after_headers, entry4)
+            await self.ignore_reject_request(self.heuristic.after_headers, entry5)
 
-            self.assertEqual(kb.redirects["/admin/"], "%s/login.php" % self.host)
-            self.assertEqual(kb.redirects["/"], "%s/login.php" % self.host)
-            self.assertEqual(kb.redirects["/path/to/admin/"], "%s/login.php" % self.host)
+            self.assertEqual(kb.redirects["%s/admin/" % first_host], "%s/login.php" % first_host)
+            self.assertEqual(kb.redirects["%s/" % first_host], "%s/login.php" % first_host)
+            self.assertEqual(kb.redirects["%s/path/to/admin/" % first_host], "%s/login.php" % first_host)
+            self.assertEqual(kb.redirects["%s/admin/" % second_host], "%s/login.php" % second_host)
+            self.assertEqual(kb.redirects["%s/junkpath/" % second_host], "%s/login.php" % second_host)
+            self.assertEqual(kb.redirects["%s/path/to/admin/" % second_host], "%s/login.php" % second_host)
 
-    def create_redirected_request(self, path, *, redirected_to):
-        headers = {"location": self.host + redirected_to}
+    @async_test()
+    async def test_after_headers_doesnt_request_random_filename_if_redirect_is_already_in_knowledge_base(self):
+        self.fake_engine.perform_high_priority = make_mocked_coro()
+        kb = KnowledgeBase()
+        self.heuristic.set_kb(kb)
+        kb.redirects["%s/wp-admin/" % self.host] = "%s/somewhere" % self.host
+
+        entry = self.create_redirected_request("/wp-admin/admin.php", redirected_to="/wp-login.php")
+
+        await self.heuristic.after_headers(entry)
+
+        self.fake_engine.perform_high_priority.assert_not_called()
+
+    def create_redirected_request(self, path, *, host=None, redirected_to, relative=False):
+        host = host or self.host
+        if relative:
+            headers = {"location": redirected_to}
+        else:
+            headers = {"location": host + redirected_to}
         response = StaticResponse(code=302, headers=headers, content=b"content")
-        return Entry.create(self.host + path, response=response)
+        return Entry.create(host + path, response=response)
 
     def assertRequested(self, url, request_method, order=None):
         requested = False
