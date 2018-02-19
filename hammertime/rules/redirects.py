@@ -17,7 +17,8 @@
 
 
 from copy import copy
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
+from uuid import uuid4
 
 from hammertime.http import Entry
 from hammertime.ruleset import Heuristics, RejectRequest
@@ -35,6 +36,7 @@ class FollowRedirects:
 
     def set_engine(self, engine):
         self.engine = engine
+        self.child_heuristics.request_engine = engine
 
     async def on_request_successful(self, entry):
         status_code = entry.response.code
@@ -65,3 +67,61 @@ class FollowRedirects:
         entry = await self.engine.perform(entry, self.child_heuristics)
         self.engine.stats.completed += 1
         return entry
+
+
+class RejectCatchAllRedirect:
+
+    def __init__(self):
+        self.engine = None
+        self.redirects = {}
+        self.child_heuristics = Heuristics()
+
+    def set_engine(self, engine):
+        self.engine = engine
+        self.child_heuristics.request_engine = engine
+
+    def set_kb(self, kb):
+        kb.redirects = self.redirects
+
+    async def after_headers(self, entry):
+        if entry.response.code in valid_redirects and "location" in entry.response.headers:
+            url = entry.request.url
+            redirect_for_request = self._to_absolute_url(url, entry.response.headers["location"])
+            default_redirect_for_path = await self._get_default_redirect_for_path(self._get_path(url))
+            if redirect_for_request == default_redirect_for_path:
+                raise RejectRequest("Catch-all redirect rejected: {} redirected to {}".format(
+                    url, default_redirect_for_path))
+
+    async def _get_default_redirect_for_path(self, path):
+        if path in self.redirects:
+            return self.redirects[path]
+        else:
+            random_url = self._build_random_url(path)
+            _entry = await self.engine.perform_high_priority(Entry.create(random_url), self.child_heuristics)
+            if _entry.response.code in valid_redirects:
+                try:
+                    default_redirect = self._to_absolute_url(path, _entry.response.headers["location"])
+                    self._add_redirect_to_kb(path, default_redirect)
+                    return default_redirect
+                except KeyError:
+                    pass
+            return None
+
+    def _get_path(self, complete_url):
+        path = urlparse(complete_url).path
+        path_parts = path.split("/")[:-1]
+        path = "/".join(path_parts) + "/"
+        return urljoin(complete_url, path)
+
+    def _build_random_url(self, base_path):
+        random_path = base_path + str(uuid4())
+        return random_path
+
+    def _add_redirect_to_kb(self, requested_path, redirect_url):
+        if requested_path not in self.redirects:
+            self.redirects[requested_path] = redirect_url
+
+    def _to_absolute_url(self, base_url, url):
+        if urlparse(url).netloc == "":
+            return urljoin(base_url, url)
+        return url
