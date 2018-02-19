@@ -34,6 +34,7 @@ class TestRejectCatchAllRedirect(TestCase):
         self.host = "http://example.com"
         self.fake_engine = MagicMock()
         self.heuristic.set_engine(self.fake_engine)
+        self.heuristic.child_heuristics = MagicMock()
 
     @async_test()
     async def test_after_headers_request_random_filename_in_same_path_as_initial_request_if_response_is_redirect(self):
