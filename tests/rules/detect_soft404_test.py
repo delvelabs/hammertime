@@ -17,7 +17,7 @@
 
 
 from unittest import TestCase
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 import random
 import hashlib
 from urllib.parse import urljoin, urlparse
@@ -44,35 +44,23 @@ class TestDetectSoft404(TestCase):
         self.rule.set_kb(self.kb)
         self.patterns = ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]
         self.rule.child_heuristics = MagicMock()
+        self.host = "http://example.com"
 
     @async_test()
     async def test_call_made_to_alternate_url_for_request_url_pattern(self):
+        urls = ["/test", "/test/", "/.test", "/123/test.html", "/TEST/123.min.js", "/test/TEST.json", "/123/test.png",
+                "/TEST/test.gif"]
+        alternate_urls = ["/a", "/a/", "/.a", "/1/a.html", "/A/1.a.js", "/a/A.json", "/1/a.png", "/A/a.gif"]
         module_path = "hammertime.rules.status.string"
         response = StaticResponse(200, {}, content="content")
         self.engine.response = response
+
         with patch(module_path + ".ascii_uppercase", "A"), patch(module_path + ".ascii_lowercase", "a"), \
              patch(module_path + ".digits", "1"), \
              patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
-
-            await self.rule.after_response(self.create_entry("http://example.com/test"))
-            await self.rule.after_response(self.create_entry("http://example.com/test/"))
-            await self.rule.after_response(self.create_entry("http://example.com/.test"))
-            await self.rule.after_response(self.create_entry("http://example.com/123/test.html"))
-            await self.rule.after_response(self.create_entry("http://example.com/TEST/123.min.js"))
-            await self.rule.after_response(self.create_entry("http://example.com/test/TEST.json"))
-            await self.rule.after_response(self.create_entry("http://example.com/123/test.png"))
-            await self.rule.after_response(self.create_entry("http://example.com/TEST/test.gif"))
-
-            self.engine.mock.perform_high_priority.assert_has_calls([
-                call(Entry.create("http://example.com/a", response=response), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/a/", response=response), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/.a", response=response), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/1/a.html", response=response), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/A/1.a.js", response=response), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/a/A.json", response=response), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/1/a.png", response=response), self.rule.child_heuristics),
-                call(Entry.create("http://example.com/A/a.gif", response=response), self.rule.child_heuristics),
-            ])
+            for url, alternate_url in zip(urls, alternate_urls):
+                await self.rule.after_response(self.create_entry(self.host + url))
+                self.assertRequested(self.host + alternate_url)
 
     @async_test()
     async def test_calls_not_made_second_time_around(self):
@@ -204,24 +192,23 @@ class TestDetectSoft404(TestCase):
 
         self.assertFalse(entry.result.soft404)
 
-    def test_extract_pattern_from_url(self):
+    def test_extract_pattern_from_url_replace_last_element_in_path_with_its_pattern(self):
         paths = ["/test", "/test/", "/test.html", "/test.png", "/test.json",
                  "/test/test2/test.123.js", "/test/.test", "/.test", "/", "/.test/123.php", "/TEST/.123.html"]
 
-        patterns = ["/\l", "/\l/", "/\l.html", "/\l.png", "/\l.json", "/\l/\l.\d.js", "/\l/.\l", "/.\l", "/",
-                    "/.\l/\d.php", "/\L/.\d.html"]
+        patterns = ["/\l", "/\l/", "/\l.html", "/\l.png", "/\l.json", "/test/test2/\l.\d.js", "/test/.\l", "/.\l", "/",
+                    "/.test/\d.php", "/TEST/.\d.html"]
         url = "http://www.example.com/"
         for path, pattern in zip(paths, patterns):
             self.assertEqual(self.rule._extract_pattern_from_url(urljoin(url, path)), pattern)
 
     def test_extract_filename_pattern_from_url_path(self):
-        paths = ["/test", "/test-123", "/123-test", "/te12st34", "/TEST.html", "/test-123.html", "/123_test.html",
-                 "/te12.st34.html", "/.Test", "/.teSt-123", "/.123-test", "/.123_test", "/.te12st34", "/tESt/",
-                 "/123/test.js", "/test.php"]
+        filenames = ["test", "test-123", "123-test", "te12st34", "TEST.html", "test-123.html", "123_test.html",
+                     "te12.st34.html", ".Test", ".teSt-123", ".123-test", ".123_test", ".te12st34", "test.php"]
         patterns = ["\l", "\l-\d", "\d-\l", "\w", "\L.html", "\l-\d.html", "\w.html", "\w.\w.html", ".\i",
-                    ".\i-\d", ".\d-\l", ".\w", ".\w", "", "\l.js", "\l.php"]
-        for path, pattern in zip(paths, patterns):
-            self.assertEqual(self.rule._extract_filename_pattern_from_url_path(path), pattern)
+                    ".\i-\d", ".\d-\l", ".\w", ".\w", "\l.php"]
+        for filename, pattern in zip(filenames, patterns):
+            self.assertEqual(self.rule._extract_filename_pattern_from_url_path(filename), pattern)
 
     def test_create_random_url_matching_url_pattern_of_request(self):
         self.rule.random_token = str(uuid.uuid4())
@@ -243,17 +230,14 @@ class TestDetectSoft404(TestCase):
             self.assertIsNotNone(re.match(regex, urlparse(result).path))
 
     def test_extract_directory_pattern_from_url_path(self):
-        paths = ["/test/", "/123/", "/TEST/", "/teST/", "/test123/", "/.test/", "/.123/", "/123-test/", "/.TEST-123/",
-                 "/", "/test.html"]
-        filenames = ["test.json", "test.html", "test.js", "", "test", ".test", "test.123.php"]
-        url_path = [path + random.choice(filenames) for path in paths]
+        paths = ["/test", "/123", "/TEST", "/teST", "/test123", "/.test", "/.123", "/123-test", "/.TEST-123", "/"]
 
-        directory_patterns = [self.rule._extract_directory_pattern(path) for path in url_path]
+        directory_patterns = [self.rule._extract_directory_pattern(path) for path in paths]
 
-        expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/\w/", "/.\l/", "/.\d/", "/\d-\l/", "/.\L-\d/", "/", "/"]
+        expected = ["/\l", "/\d", "/\L", "/\i", "/\w", "/.\l", "/.\d", "/\d-\l", "/.\L-\d", "/"]
         self.assertEqual(directory_patterns, expected)
 
-    def test_extract_directory_pattern_from_url_path_return_only_pattern_of_first_directory(self):
+    def test_extract_directory_pattern_from_url_path_return_path_and_replace_last_subdirectory_with_its_pattern(self):
         paths = ["/test/123/", "/123/test/", "/TEST/test/", "/teST/123/", "/.test/123/", "/.123/test/", "/123-test/12/",
                  "/123/test-123/"]
         filenames = ["test.json", "test.html", "test.js", "", "test", ".test", "test.123.php"]
@@ -267,6 +251,11 @@ class TestDetectSoft404(TestCase):
     def create_entry(self, url, response_code=200, response_content="response content"):
         response = StaticResponse(response_code, {}, response_content)
         return Entry.create(url, response=response)
+
+    def assertRequested(self, url):
+        entry = self.engine.mock.perform_high_priority.call_args[0][0]
+        self.assertEqual(entry.request.url, url)
+        self.engine.mock.reset_mock()
 
 
 class FakeEngine(Engine):

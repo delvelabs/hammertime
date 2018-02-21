@@ -130,9 +130,11 @@ class DetectSoft404:
         directory_path, filename = os.path.split(url_path)
         if directory_path == "/":
             return "/"
-        directories = re.split("/", directory_path[1:])  # Skip the leading "/"
-        directory_pattern = self._create_pattern_from_string(directories[0])  # only use the pattern of the first directory.
-        return "/%s/" % directory_pattern
+        if len(filename) > 0:
+            return directory_path + "/"
+        directories = directory_path.split("/")
+        directory_pattern = self._create_pattern_from_string(directories[-1])
+        return "%s/%s/" % ("/".join(directories[:-1]), directory_pattern)
 
     def _extract_filename_pattern_from_url_path(self, path):
         directory_path, filename = os.path.split(path)
