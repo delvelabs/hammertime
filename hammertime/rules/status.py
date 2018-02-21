@@ -64,7 +64,9 @@ class DetectSoft404:
     async def after_response(self, entry):
         soft_404_response = await self.get_soft_404_sample(entry.request.url)
         if soft_404_response is not None and self._match(entry.response, soft_404_response):
-            raise RejectRequest("Request is a soft 404.")
+            entry.result.soft404 = True
+        else:
+            entry.result.soft404 = False
 
     async def get_soft_404_sample(self, url):
         server_address = urljoin(url, "/")
