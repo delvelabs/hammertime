@@ -51,13 +51,13 @@ class TestDetectSoft404(TestCase):
                 "/TEST/test.gif"]
         alternate_urls = ["/a", "/a/", "/.a", "/123/a.html", "/TEST/1.a.js", "/test/A.json", "/123/a.png",
                           "/TEST/a.gif"]
-        module_path = "hammertime.rules.status.string"
+        module_path = "hammertime.rules.soft404.string"
         response = StaticResponse(200, {}, content="content")
         self.engine.response = response
 
         with patch(module_path + ".ascii_uppercase", "A"), patch(module_path + ".ascii_lowercase", "a"), \
              patch(module_path + ".digits", "1"), \
-             patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
+             patch("hammertime.rules.soft404.random.randint", MagicMock(return_value=1)):
             for url, alternate_url in zip(urls, alternate_urls):
                 await self.rule.after_response(self.create_entry(self.host + url))
                 self.assertRequested(self.host + alternate_url)
