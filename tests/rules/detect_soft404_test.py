@@ -22,6 +22,7 @@ import hashlib
 from urllib.parse import urljoin, urlparse
 import uuid
 import re
+from aiohttp.test_utils import make_mocked_coro
 
 from hammertime.rules import DetectSoft404
 from hammertime.rules.simhash import Simhash
@@ -189,6 +190,16 @@ class TestDetectSoft404(TestCase):
 
         await self.rule.after_response(entry)
 
+        self.assertFalse(entry.result.soft404)
+
+    @async_test()
+    async def test_after_response_skip_sample_and_mark_entry_as_not_soft404_if_response_code_is_not_200(self):
+        entry = Entry.create("http://example.com/", response=StaticResponse(403, {}))
+        self.rule.get_soft_404_sample = make_mocked_coro()
+
+        await self.rule.after_response(entry)
+
+        self.rule.get_soft_404_sample.assert_not_called()
         self.assertFalse(entry.result.soft404)
 
     def test_extract_pattern_from_url_replace_last_element_in_path_with_its_pattern(self):
