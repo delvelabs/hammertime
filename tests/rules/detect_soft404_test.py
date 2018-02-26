@@ -42,7 +42,6 @@ class TestDetectSoft404(TestCase):
         self.rule.set_engine(self.engine)
         self.kb = KnowledgeBase()
         self.rule.set_kb(self.kb)
-        self.patterns = ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]
         self.rule.child_heuristics = MagicMock()
         self.host = "http://example.com"
 
@@ -50,7 +49,8 @@ class TestDetectSoft404(TestCase):
     async def test_call_made_to_alternate_url_for_request_url_pattern(self):
         urls = ["/test", "/test/", "/.test", "/123/test.html", "/TEST/123.min.js", "/test/TEST.json", "/123/test.png",
                 "/TEST/test.gif"]
-        alternate_urls = ["/a", "/a/", "/.a", "/1/a.html", "/A/1.a.js", "/a/A.json", "/1/a.png", "/A/a.gif"]
+        alternate_urls = ["/a", "/a/", "/.a", "/123/a.html", "/TEST/1.a.js", "/test/A.json", "/123/a.png",
+                          "/TEST/a.gif"]
         module_path = "hammertime.rules.status.string"
         response = StaticResponse(200, {}, content="content")
         self.engine.response = response
@@ -98,7 +98,7 @@ class TestDetectSoft404(TestCase):
             "/\l": {"code": 200, "content_simhash": simhash},
             "/\d/": {"code": 200, "content_simhash": simhash},
             "/.\l": {"code": 200, "content_simhash": simhash},
-            "/\d/\l.js": {"code": 200, "content_simhash": simhash}})
+            "/123/\l.js": {"code": 200, "content_simhash": simhash}})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):
@@ -121,13 +121,13 @@ class TestDetectSoft404(TestCase):
 
     @async_test()
     async def test_mark_request_has_soft404_if_pattern_and_response_match_request_in_knowledge_base(self):
-        for pattern in self.patterns:
+        for pattern in ["/test/\d.html", "/\d-\l.js", "/\L/", "/\i", "/abc/.\l.js"]:
             simhash = Simhash("response content").value
             self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
             self.rule.performed["http://example.com/"][pattern] = None
 
         urls = [urljoin("http://example.com/", path) for path in ["/test/123.html", "/123-test.js", "/TEST/", "/TesT",
-                                                                  "/.test.js"]]
+                                                                  "/abc/.test.js"]]
         entries = [self.create_entry(url) for url in urls]
         for entry in entries:
             await self.rule.after_response(entry)
@@ -183,7 +183,7 @@ class TestDetectSoft404(TestCase):
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
         simhash = Simhash("response content").value
-        for pattern in self.patterns:
+        for pattern in ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]:
             self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
             self.rule.performed["http://example.com/"] = {pattern: None}
         entry = self.create_entry("http://example.com/", response_content="home page")
@@ -202,13 +202,32 @@ class TestDetectSoft404(TestCase):
         for path, pattern in zip(paths, patterns):
             self.assertEqual(self.rule._extract_pattern_from_url(urljoin(url, path)), pattern)
 
-    def test_extract_filename_pattern_from_url_path(self):
+    def test_get_pattern_for_filename(self):
         filenames = ["test", "test-123", "123-test", "te12st34", "TEST.html", "test-123.html", "123_test.html",
                      "te12.st34.html", ".Test", ".teSt-123", ".123-test", ".123_test", ".te12st34", "test.php"]
         patterns = ["\l", "\l-\d", "\d-\l", "\w", "\L.html", "\l-\d.html", "\w.html", "\w.\w.html", ".\i",
                     ".\i-\d", ".\d-\l", ".\w", ".\w", "\l.php"]
         for filename, pattern in zip(filenames, patterns):
-            self.assertEqual(self.rule._extract_filename_pattern_from_url_path(filename), pattern)
+            self.assertEqual(self.rule._get_pattern_for_filename(filename), pattern)
+
+    def test_get_pattern_for_directory(self):
+        directories = ["/test", "/123", "/TEST", "/teST", "/test123", "/.test", "/.123", "/123-test",
+                       "/.TEST-123", "/"]
+
+        directory_patterns = [self.rule._get_pattern_for_directory(dir) for dir in directories]
+
+        expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/\w/", "/.\l/", "/.\d/", "/\d-\l/", "/.\L-\d/", "/"]
+        self.assertEqual(directory_patterns, expected)
+
+    def test_get_pattern_for_directory_replace_only_last_subdirectory_of_path_with_its_pattern(self):
+        paths = ["/test/123", "/123/test", "/test/TEST", "/123/teST", "/123/.test", "/test/.123", "/dir/123-test",
+                 "/123/test-123"]
+
+        directory_patterns = [self.rule._get_pattern_for_directory(path) for path in paths]
+
+        expected = ["/test/\d/", "/123/\l/", "/test/\L/", "/123/\i/", "/123/.\l/", "/test/.\d/", "/dir/\d-\l/",
+                    "/123/\l-\d/"]
+        self.assertEqual(directory_patterns, expected)
 
     def test_create_random_url_matching_url_pattern_of_request(self):
         self.rule.random_token = str(uuid.uuid4())
@@ -228,25 +247,6 @@ class TestDetectSoft404(TestCase):
         for result, regex in zip(random_urls, expected):
             self.assertTrue(result.startswith(base_url))
             self.assertIsNotNone(re.match(regex, urlparse(result).path))
-
-    def test_extract_directory_pattern_from_url_path(self):
-        paths = ["/test", "/123", "/TEST", "/teST", "/test123", "/.test", "/.123", "/123-test", "/.TEST-123", "/"]
-
-        directory_patterns = [self.rule._extract_directory_pattern(path) for path in paths]
-
-        expected = ["/\l", "/\d", "/\L", "/\i", "/\w", "/.\l", "/.\d", "/\d-\l", "/.\L-\d", "/"]
-        self.assertEqual(directory_patterns, expected)
-
-    def test_extract_directory_pattern_from_url_path_return_path_and_replace_last_subdirectory_with_its_pattern(self):
-        paths = ["/test/123/", "/123/test/", "/TEST/test/", "/teST/123/", "/.test/123/", "/.123/test/", "/123-test/12/",
-                 "/123/test-123/"]
-        filenames = ["test.json", "test.html", "test.js", "", "test", ".test", "test.123.php"]
-        url_path = [path + random.choice(filenames) for path in paths]
-
-        directory_patterns = [self.rule._extract_directory_pattern(path) for path in url_path]
-
-        expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/.\l/", "/.\d/", "/\d-\l/", "/\d/"]
-        self.assertEqual(directory_patterns, expected)
 
     def create_entry(self, url, response_code=200, response_content="response content"):
         response = StaticResponse(response_code, {}, response_content)
