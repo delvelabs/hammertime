@@ -309,5 +309,3 @@ class FakeEngine(Engine):
         entry.response = self.response or StaticResponse(200, {}, content="content")
         self.mock.perform_high_priority(entry, heuristics)
         return entry
-
-
