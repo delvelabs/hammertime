@@ -87,7 +87,8 @@ Parameters:
 
 **class hammertime.rules.DetectSoft404(distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4)**
     
-Detect and reject response for a page not found when a server does not respond with 404 for pages not found.
+Detect and flag response for a page not found when a server respond with a 200 for pages not found. 
+```entry.result.soft404``` is set to ```True ``` if the server responded with a soft 404, else it is set to ```False```.
   
 Parameters:
 
@@ -97,21 +98,16 @@ Parameters:
                 r'[\w\u4e00-\u9fcc<>]+'
 * token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
 
-The DetectSoft404 heuristic uses its own set of heuristics for the requests it sends (called child heuristics). To 
-configure those heuristics:
-
-```python
-from hammertime import HammerTime
-from hammertime.rules import DetectSoft404, DynamicTimeout
-  
-hammertime = HammerTime(retry_count=3)
-timeout = DynamicTimeout(0.05, 2)
-soft_404_detection = DetectSoft404()
-soft_404_detection.child_heuristics.add(timeout)
-hammertime.heuristics.add_multiple((timeout, soft_404_detection))
-```
+To automatically reject all soft 404s, use the RejectSoft404 heuristic in combination with this heuristic (DetectSoft404
+has to be added before RejectSoft404 to the list of heuristics).
 
 This heuristic supports [child heuristics](#child-heuristic).
+
+
+**class hammertime.rules.RejectSoft404()**
+
+Raise RejectRequest when a entry is flagged as a soft 404 (```entry.result.soft404``` set to ```True ```). DetectSoft404
+ needs to be in the list of heuristics before this heuristic, else ```entry.result.soft404``` will be undefined.
 
 
 **class hammertime.rules.SetHeader(name, value)**
