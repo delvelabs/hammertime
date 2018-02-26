@@ -17,7 +17,7 @@
 
 from .body import IgnoreLargeBody
 from .header import SetHeader
-from .status import RejectStatusCode, DetectSoft404
+from .status import RejectStatusCode, DetectSoft404, RejectSoft404
 from .timeout import DynamicTimeout
 from .redirects import FollowRedirects, RejectCatchAllRedirect
 from .deadhostdetection import DeadHostDetection
@@ -35,6 +35,7 @@ __all__ = [
     IgnoreLargeBody,
     RejectCatchAllRedirect,
     RejectErrorBehavior,
+    RejectSoft404,
     RejectStatusCode,
     SetHeader,
 ]

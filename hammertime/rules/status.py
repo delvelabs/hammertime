@@ -25,7 +25,7 @@ import random
 import string
 import hashlib
 
-from ..ruleset import RejectRequest, Heuristics, StopRequest
+from ..ruleset import RejectRequest, StopRequest
 from ..http import Entry
 from .simhash import Simhash, DEFAULT_FILTER
 
@@ -62,9 +62,14 @@ class DetectSoft404:
         self.child_heuristics = heuristics
 
     async def after_response(self, entry):
-        soft_404_response = await self.get_soft_404_sample(entry.request.url)
-        if soft_404_response is not None and self._match(entry.response, soft_404_response):
-            raise RejectRequest("Request is a soft 404.")
+        if entry.response.code != 200:
+            entry.result.soft404 = False
+        else:
+            soft_404_response = await self.get_soft_404_sample(entry.request.url)
+            if soft_404_response is not None and self._match(entry.response, soft_404_response):
+                entry.result.soft404 = True
+            else:
+                entry.result.soft404 = False
 
     async def get_soft_404_sample(self, url):
         server_address = urljoin(url, "/")
@@ -111,7 +116,7 @@ class DetectSoft404:
             return False
 
     def _extract_pattern_from_url(self, url):
-        """Return the pattern of the path part of the URL in a regex-like format:
+        """Return the path part of the URL with the last element replaced with its pattern in a regex-like format:
         \l -> lowercase letters, same as [a-z]+
         \L -> uppercase letters, same as [A-Z]+
         \i -> letters ignoring case, same as [a-zA-Z]+
@@ -120,25 +125,29 @@ class DetectSoft404:
         All other characters match themselves
         """
         path = urlparse(url).path
-        directory_pattern = self._extract_directory_pattern(path)
-        filename_pattern = self._extract_filename_pattern_from_url_path(path)
-        return directory_pattern + filename_pattern
+        directories, filename = os.path.split(path)
+        if len(filename) > 0:
+            pattern = self._get_pattern_for_filename(filename)
+            if directories[-1] != "/":
+                directories += "/"
+            return directories + pattern
+        else:
+            return self._get_pattern_for_directory(directories)
 
-    def _extract_directory_pattern(self, url_path):
-        directory_path, filename = os.path.split(url_path)
+    def _get_pattern_for_directory(self, directory_path):
         if directory_path == "/":
             return "/"
-        directories = re.split("/", directory_path[1:])  # Skip the leading "/"
-        directory_pattern = self._create_pattern_from_string(directories[0])  # only use the pattern of the first directory.
-        return "/%s/" % directory_pattern
-
-    def _extract_filename_pattern_from_url_path(self, path):
-        directory_path, filename = os.path.split(path)
-        if len(filename) > 0:
-            filename, extension = os.path.splitext(filename)
-            return self._create_pattern_from_string(filename) + extension
+        directory_path = directory_path.strip("/")
+        directories = directory_path.split("/")
+        if len(directories) > 1:
+            directory_pattern = self._create_pattern_from_string(directories[-1])
+            return "/%s/%s/" % ("/".join(directories[:-1]), directory_pattern)
         else:
-            return ""
+            return "/%s/" % self._create_pattern_from_string(directories[0])
+
+    def _get_pattern_for_filename(self, filename):
+        filename, extension = os.path.splitext(filename)
+        return self._create_pattern_from_string(filename) + extension
 
     def _create_pattern_from_string(self, string):
         parts = re.split("\W", string)
@@ -180,3 +189,10 @@ class DetectSoft404:
             return "".join([random.choice(choices) for _ in range(length)])
         else:
             return ""
+
+
+class RejectSoft404:
+
+    async def after_response(self, entry):
+        if entry.result.soft404:
+            raise RejectRequest("Response to %s is a soft 404." % entry.request)
