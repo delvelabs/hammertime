@@ -173,3 +173,10 @@ class DetectSoft404:
             return "".join([random.choice(choices) for _ in range(length)])
         else:
             return ""
+
+
+class RejectSoft404:
+
+    async def after_response(self, entry):
+        if entry.result.soft404:
+            raise RejectRequest("Response to %s is a soft 404." % entry.request)

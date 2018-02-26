@@ -18,7 +18,6 @@
 
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
-import random
 import hashlib
 from urllib.parse import urljoin, urlparse
 import uuid
