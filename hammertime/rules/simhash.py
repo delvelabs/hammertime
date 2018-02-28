@@ -24,7 +24,6 @@ DEFAULT_FILTER = r'[\w\u4e00-\u9fcc<>]+'
 try:
     from simhash import shingle, unsigned_hash, compute, num_differing_bits
 
-
     class Simhash:
 
         def __init__(self, data, filter=DEFAULT_FILTER, token_size=4):
@@ -47,7 +46,6 @@ try:
 
 except ImportError:
     from simhash import Simhash as _Simhash
-
 
     class Simhash(_Simhash):
 
