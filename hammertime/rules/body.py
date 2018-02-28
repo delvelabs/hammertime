@@ -32,6 +32,9 @@ class IgnoreLargeBody:
     def set_kb(self, kb):
         kb.body_size = self.data
 
+    def load_kb(self, kb):
+        self.data = kb.body_size
+
     async def after_headers(self, entry):
         entry.result.read_length = self._get_read_limit(entry.response)
 

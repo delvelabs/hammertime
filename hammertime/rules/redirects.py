@@ -82,6 +82,9 @@ class RejectCatchAllRedirect:
     def set_kb(self, kb):
         kb.redirects = self.redirects
 
+    def load_kb(self, kb):
+        self.redirects = kb.redirects
+
     def set_child_heuristics(self, heuristics):
         self.child_heuristics = heuristics
 
