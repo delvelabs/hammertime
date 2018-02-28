@@ -148,7 +148,7 @@ class HeuristicsTest(TestCase):
 
         parent_heuristic.child_heuristics.add(child_heuristic)
 
-        self.assertEqual(child_heuristic.heuristic_b_data, h.kb.heuristic_b_data)
+        self.assertEqual(child_heuristic.kb_load, kb)
 
 
 class HeuristicBad:
@@ -176,9 +176,9 @@ class HeuristicA:
 
 class HeuristicB:
 
-    kb_set = "NO"
-
     def __init__(self):
+        self.kb_set = "NO"
+        self.kb_load = "NO"
         self.heuristic_b_data = []
 
     def set_kb(self, kb):
@@ -186,7 +186,7 @@ class HeuristicB:
         kb.heuristic_b_data = self.heuristic_b_data
 
     def load_kb(self, kb):
-        self.heuristic_b_data = kb.heuristic_b_data
+        self.kb_load = kb
 
     async def before_request(self, entry):
         pass
