@@ -43,7 +43,13 @@ class Heuristics:
             heuristic.set_engine(self.request_engine)
 
         if "set_kb" in supported and self.kb is not None:
-            heuristic.set_kb(self.kb)
+            try:
+                heuristic.set_kb(self.kb)
+            except AttributeError:
+                if "load_kb" in supported:
+                    heuristic.load_kb(self.kb)
+                else:
+                    raise
 
         if "set_child_heuristics" in supported:
             heuristic.set_child_heuristics(Heuristics(request_engine=self.request_engine, kb=self.kb))

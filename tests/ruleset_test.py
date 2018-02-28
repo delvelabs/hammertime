@@ -17,12 +17,12 @@
 
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
+from aiohttp.test_utils import make_mocked_coro
 
 from fixtures import async_test
 from hammertime.ruleset import RuleSet, Heuristics, StopRequest
 from hammertime.http import Entry
-from aiohttp.test_utils import make_mocked_coro
-import asyncio
+from hammertime.kb import KnowledgeBase
 
 
 class RuleSetTest(TestCase):
@@ -112,11 +112,13 @@ class HeuristicsTest(TestCase):
     def test_assign_engine_and_kb_on_heuristics(self):
         a = HeuristicA()
         b = HeuristicB()
+        kb = KnowledgeBase()
+        h = Heuristics(request_engine="X", kb=kb)
 
-        h = Heuristics(request_engine="X", kb="Y")
         h.add_multiple([a, b])
+
         self.assertEqual(a.engine_set, "X")
-        self.assertEqual(b.kb_set, "Y")
+        self.assertEqual(b.kb_set, kb)
 
     def test_do_not_override_with_none(self):
         a = HeuristicA()
@@ -135,6 +137,18 @@ class HeuristicsTest(TestCase):
 
         self.assertEqual(parent_heuristic.child_heuristics.kb, "kb")
         self.assertEqual(parent_heuristic.child_heuristics.request_engine, "engine")
+
+    def test_add_load_kb_if_value_already_defined_in_kb(self):
+        kb = KnowledgeBase()
+        h = Heuristics(kb=kb, request_engine="engine")
+        parent_heuristic = ParentHeuristic()
+        h.add(parent_heuristic)
+        h.add(HeuristicB())
+        child_heuristic = HeuristicB()
+
+        parent_heuristic.child_heuristics.add(child_heuristic)
+
+        self.assertEqual(child_heuristic.kb_load, kb)
 
 
 class HeuristicBad:
@@ -162,10 +176,17 @@ class HeuristicA:
 
 class HeuristicB:
 
-    kb_set = "NO"
+    def __init__(self):
+        self.kb_set = "NO"
+        self.kb_load = "NO"
+        self.heuristic_b_data = []
 
     def set_kb(self, kb):
         self.kb_set = kb
+        kb.heuristic_b_data = self.heuristic_b_data
+
+    def load_kb(self, kb):
+        self.kb_load = kb
 
     async def before_request(self, entry):
         pass

@@ -21,7 +21,7 @@ from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
 from hammertime.http import Entry
-from hammertime.ruleset import Heuristics, RejectRequest
+from hammertime.ruleset import RejectRequest
 
 
 valid_redirects = (301, 302, 303, 307, 308)
@@ -81,6 +81,9 @@ class RejectCatchAllRedirect:
 
     def set_kb(self, kb):
         kb.redirects = self.redirects
+
+    def load_kb(self, kb):
+        self.redirects = kb.redirects
 
     def set_child_heuristics(self, heuristics):
         self.child_heuristics = heuristics

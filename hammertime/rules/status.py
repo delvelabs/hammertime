@@ -58,6 +58,9 @@ class DetectSoft404:
     def set_kb(self, kb):
         kb.soft_404_responses = self.soft_404_responses
 
+    def load_kb(self, kb):
+        self.soft_404_responses = kb.soft_404_responses
+
     def set_child_heuristics(self, heuristics):
         self.child_heuristics = heuristics
 

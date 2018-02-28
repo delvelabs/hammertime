@@ -31,6 +31,9 @@ class DynamicTimeout:
     def set_kb(self, kb):
         kb.timeout_manager = self.timeout_manager
 
+    def load_kb(self, kb):
+        self.timeout_manager = kb.timeout_manager
+
     def set_engine(self, engine):
         self.retry_count = engine.retry_count
 

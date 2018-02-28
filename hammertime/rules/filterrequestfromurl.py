@@ -90,5 +90,3 @@ class FilterRequestFromURL:
             if filter_path[i] != path_parts[i]:
                 return False
         return True
-
-

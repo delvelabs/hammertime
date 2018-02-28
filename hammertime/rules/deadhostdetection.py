@@ -31,6 +31,9 @@ class DeadHostDetection:
     def set_kb(self, kb):
         kb.dead_hosts = self.dead_hosts
 
+    def load_kb(self, kb):
+        self.dead_hosts = kb.dead_hosts
+
     async def before_request(self, entry):
         host = self._get_host(entry)
         if host not in self.hosts:

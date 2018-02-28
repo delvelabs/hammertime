@@ -16,13 +16,15 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-from .interface import Engine
-from .aiohttp import AioHttpEngine
-from .retry import RetryEngine
+from unittest import TestCase
+
+import hammertime.rules as rules
 
 
-__all__ = [
-    Engine,
-    AioHttpEngine,
-    RetryEngine
-]
+class TestHeuristics(TestCase):
+
+    def test_heuristics_define_load_kb_if_using_kb(self):
+        for Heuristic in rules.__all__:
+            if hasattr(Heuristic, "set_kb"):
+                self.assertTrue(hasattr(Heuristic, "load_kb"), msg="%s must define load_kb if using the knowledge "
+                                                                   "base." % Heuristic)
