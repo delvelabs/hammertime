@@ -33,7 +33,7 @@ class DetectBehaviorChange:
         kb.behavior_buffer = self.previous_responses
 
     def load_kb(self, kb):
-        self.previous_responses= kb.behavior_buffer
+        self.previous_responses = kb.behavior_buffer
 
     async def after_response(self, entry):
         resp_content = self._read_content(entry.response)

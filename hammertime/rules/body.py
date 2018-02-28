@@ -59,7 +59,7 @@ class IgnoreLargeBody:
             try:
                 length = int(length)
                 self.data.add(length)
-                return  self.data.applicable_limit
+                return self.data.applicable_limit
             except ValueError:
                 logger.debug("Bad Content-Length: %s", length)
 
