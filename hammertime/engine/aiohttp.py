@@ -21,6 +21,7 @@ from async_timeout import timeout
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
 from aiohttp.connector import TCPConnector
+from aiohttp.helpers import DummyCookieJar
 import ssl
 
 from ..ruleset import StopRequest, RejectRequest
@@ -28,14 +29,20 @@ from ..ruleset import StopRequest, RejectRequest
 
 class AioHttpEngine:
 
-    def __init__(self, *, loop, verify_ssl=True, ca_certificate_file=None, proxy=None, timeout=0.2):
+    def __init__(self, *, loop, verify_ssl=True, ca_certificate_file=None, proxy=None, timeout=0.2,
+                 disable_cookies=False, client_session=None):
         self.loop = loop
-        ssl_context = None
-        if ca_certificate_file is not None:
-            ssl_context = ssl.create_default_context()
-            ssl_context.load_verify_locations(cafile=ca_certificate_file)
-        connector = TCPConnector(loop=loop, verify_ssl=verify_ssl, ssl_context=ssl_context)
-        self.session = ClientSession(loop=loop, connector=connector)
+        self.session = client_session
+        if self.session is None:
+            ssl_context = None
+            if ca_certificate_file is not None:
+                ssl_context = ssl.create_default_context()
+                ssl_context.load_verify_locations(cafile=ca_certificate_file)
+            connector = TCPConnector(loop=loop, verify_ssl=verify_ssl, ssl_context=ssl_context)
+            if disable_cookies:
+                self.session = ClientSession(loop=loop, connector=connector, cookie_jar=DummyCookieJar(loop=loop))
+            else:
+                self.session = ClientSession(loop=loop, connector=connector)
         self.proxy = proxy
         self.timeout = timeout
 

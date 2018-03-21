@@ -52,7 +52,8 @@ Parameters:
 
 ## AioHttpEngine class
 
-**class hammertime.engine.AioHttpEngine(\*, loop, verify_ssl=True, ca_certificate_file=None, proxy=None, timeout=0.2)**
+**class hammertime.engine.AioHttpEngine(\*, loop, verify_ssl=True, ca_certificate_file=None, proxy=None, timeout=0.2, 
+disable_cookies=False, client_session=None)**
 
 The engine used to send HTTP requests.
 
@@ -65,6 +66,9 @@ Parameters:
                        HTTPS website without disabling SSL verification.
 * proxy: The address of the [proxy](proxy.md) to use to send requests.
 * timeout: The connection timeout for the requests. Default is 0.2 seconds.
+* disable_cookies: If True, the aiohttp.ClientSession won't manage session cookies. False by default.
+* client_session: The aiohttp.ClientSession used by the engine if custom settings are required. If None, the engine will
+ create one. Default is None.
                 
 **coroutine hammertime.engine.AioHttpEngine.perform(entry, heuristics)**
 
