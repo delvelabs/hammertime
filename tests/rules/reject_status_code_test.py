@@ -142,6 +142,7 @@ class TestDetectSoft404(TestCase):
         sample_response = Response(200, {})
         sample_response.set_content(bytes, True)
         self.engine.response = sample_response
+
         await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {

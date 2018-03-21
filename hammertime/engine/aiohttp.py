@@ -131,9 +131,21 @@ class Response:
     @property
     def content(self):
         if self.truncated:
-            raise ValueError("Content is only partially read")
+            return self.partial_content
+        else:
+            return self.raw.decode('utf-8')
 
-        return self.raw.decode('utf-8')
+    @property
+    def partial_content(self):
+        try:
+            return self.raw.decode("utf-8")
+        except UnicodeDecodeError as decode_error:
+            longest_bytes_sequence_in_utf8 = 4
+            if decode_error.start >= len(self.raw) - longest_bytes_sequence_in_utf8:
+                # ignore error due the the last character sequence being truncated, content is still valid utf-8.
+                return self.raw.decode("utf-8", errors="ignore")
+            else:
+                raise decode_error
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__

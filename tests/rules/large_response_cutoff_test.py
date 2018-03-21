@@ -112,3 +112,12 @@ class IgnoreLargeBodyTest(TestCase):
         await self.r.after_response(self.entry)
 
         self.assertEqual([], self.r.data.collected_sizes)
+
+    @async_test()
+    async def test_calculated_limit_is_always_integer(self):
+        body_sizes = [43, 26, 79, 32, 97, 54, 81, 33, 29, 103] * 100
+        for size in body_sizes:
+            response = StaticResponse(200, {'Content-Length': size})
+            await self.r.after_headers(Entry.create("http://example.com/", response=response))
+
+        self.assertEqual(self.r.data.calculated_limit, int(self.r.data.calculated_limit))

@@ -19,7 +19,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch, ANY
 from fixtures import async_test
 
-from hammertime.engine.aiohttp import AioHttpEngine
+from hammertime.engine.aiohttp import AioHttpEngine, Response
 from hammertime.http import Entry
 from hammertime.ruleset import Heuristics
 
@@ -92,6 +92,31 @@ class TestAioHttpEngine(TestCase):
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=ANY, allow_redirects=False,
                                                        headers={"User-Agent": "Hammertime 1.2.3"})
+
+
+class TestResponse(TestCase):
+
+    def test_partial_content_return_decoded_truncated_raw_bytes(self):
+        raw_bytes = b"abcdefg"
+        response = Response(200, {})
+        response.set_content(raw_bytes, False)
+
+        self.assertEqual(response.partial_content, "abcdefg")
+
+    def test_partial_content_ignore_truncated_utf8_characters_when_decoding(self):
+        raw_bytes = "abcdé".encode("utf-8")[:-1]  # 'é' 2nd byte will be missing
+        response = Response(200, {})
+        response.set_content(raw_bytes, False)
+
+        self.assertEqual(response.partial_content, "abcd")
+
+    def test_partial_content_raise_unicode_decode_error_if_error_not_caused_by_truncated_content(self):
+        raw_bytes = b"\x80" * 10  # Not an encoded utf-8 string
+        response = Response(200, {})
+        response.set_content(raw_bytes, False)
+
+        with self.assertRaises(UnicodeDecodeError):
+            response.partial_content
 
 
 class FakeResponse:
