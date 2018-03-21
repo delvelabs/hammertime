@@ -82,5 +82,5 @@ class BodySize:
             self.collected_sizes.append(length)
 
             if len(self.collected_sizes) > 500:
-                self.calculated_limit = mean(self.collected_sizes) + 5 * stdev(self.collected_sizes)
+                self.calculated_limit = int(mean(self.collected_sizes) + 5 * stdev(self.collected_sizes))
                 logger.info("Updating max body size to %s", self.calculated_limit)
