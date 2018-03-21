@@ -149,52 +149,6 @@ class TestDetectSoft404(TestCase):
                 "/\l": {"code": 200, "raw_content_hash": hashlib.md5(bytes).digest()}})
 
     @async_test()
-    async def test_handle_truncated_utf8_for_sample(self):
-        content = "abcdé"
-        raw = content.encode("utf-8")
-        truncated = raw[:5]  # the last byte of 'é' will be missing
-        sample_response = Response(200, {})
-        sample_response.set_content(truncated, False)
-        self.engine.response = sample_response
-
-        await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
-
-        expected = Simhash("abcd").value  # incomplete 'é' is ignored.
-        self.assertEqual(self.kb.soft_404_responses["http://example.com/"]["/\l"]["content_simhash"], expected)
-
-    @async_test()
-    async def test_handle_truncated_utf8_for_response(self):
-        self.rule.soft_404_responses["http://example.com/"]["/\l"] = {"code": 200,
-                                                                      "content_simhash": Simhash("abcd").value}
-        self.rule.performed["http://example.com/"]["/\l"] = None
-        self.rule.distance_threshold = 1  # force equal match
-        content = "abcdé"
-        raw = content.encode("utf-8")
-        truncated = raw[:5]  # the last byte of 'é' will be missing
-        response = Response(200, {})
-        response.set_content(truncated, False)
-        entry = Entry.create("http://example.com/test", response=response)
-
-        await self.rule.after_response(entry)
-
-        self.assertTrue(entry.result.soft404)
-
-    @async_test()
-    async def test_dont_decode_truncated_raw_bytes_as_utf8(self):
-        raw = b"\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80"
-        decoded_raw = ""  # result if raw bytes are treated as utf-8
-        self.rule.soft_404_responses["http://example.com/"]["/\l"] = {"code": 200,
-                                                                      "content_simhash": Simhash(decoded_raw).value}
-        self.rule.performed["http://example.com/"]["/\l"] = None
-        response = Response(200, {})
-        response.set_content(raw, False)
-        entry = Entry.create("http://example.com/test", response=response)
-
-        await self.rule.after_response(entry)
-
-        self.assertFalse(entry.result.soft404)
-
-    @async_test()
     async def test_mark_request_has_soft404_if_pattern_and_response_match_request_in_knowledge_base(self):
         for pattern in ["/test/\d.html", "/\d-\l.js", "/\L/", "/\i", "/abc/.\l.js"]:
             simhash = Simhash("response content").value
