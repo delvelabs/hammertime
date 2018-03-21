@@ -32,6 +32,9 @@ import async_timeout
 
 class InitTest(TestCase):
 
+    def test_failing_test(self):
+        self.assertTrue(False)
+
     @async_test()
     async def test_open_and_close(self, loop):
         h = HammerTime(loop=loop)
