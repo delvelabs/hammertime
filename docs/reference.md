@@ -197,3 +197,7 @@ True if the response content is truncated because the length exceed the max read
 
 **property raw**
 The content of the response in UTF-8 encoded bytes. This is a read/write property.
+
+**property partial_content**
+Same as content, but does not raise an UnicodeDecodeError if the content is truncated at the middle of a multi-bytes 
+character. The truncated character is ignore and the rest of the content is returned as a string.
