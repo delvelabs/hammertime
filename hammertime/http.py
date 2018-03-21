@@ -102,6 +102,10 @@ class StaticResponse:
     def raw(self, value):
         self.content = value.decode('utf-8')
 
+    @property
+    def partial_content(self):
+        return self.content
+
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
