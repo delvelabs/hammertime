@@ -18,7 +18,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from fixtures import async_test, fake_future
+from fixtures import async_test
 from hammertime.http import Entry, StaticResponse
 from hammertime.rules import DetectBehaviorChange, RejectErrorBehavior
 from hammertime.kb import KnowledgeBase

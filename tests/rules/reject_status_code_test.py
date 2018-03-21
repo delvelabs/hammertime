@@ -84,8 +84,9 @@ class TestDetectSoft404(TestCase):
         self.engine.response = response
 
         with patch(module_path + ".ascii_uppercase", "A"), patch(module_path + ".ascii_lowercase", "a"), \
-             patch(module_path + ".digits", "1"), \
-             patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
+            patch(module_path + ".digits", "1"), \
+                patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
+
             for url, alternate_url in zip(urls, alternate_urls):
                 await self.rule.after_response(self.create_entry(self.host + url))
                 self.assertRequested(self.host + alternate_url)

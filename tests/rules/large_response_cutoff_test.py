@@ -67,14 +67,14 @@ class IgnoreLargeBodyTest(TestCase):
 
         self.assertEqual(self.entry.result.read_length, self.r.initial_limit)
 
-        await self.r.after_headers(Entry.create("http://example.om/test",
-                                                response=StaticResponse(200, {'Content-Length': self.r.initial_limit * 2})))
+        response = StaticResponse(200, {'Content-Length': self.r.initial_limit * 2})
+        await self.r.after_headers(Entry.create("http://example.om/test", response=response))
 
     @async_test()
     async def test_content_size_adjusts_over_time(self):
         for _ in range(1000):
-            await self.r.after_headers(Entry.create("http://example.om/test",
-                                                    response=StaticResponse(200, {'Content-Length': random.randint(10000, 20000)})))
+            response = StaticResponse(200, {'Content-Length': random.randint(10000, 20000)})
+            await self.r.after_headers(Entry.create("http://example.om/test", response=response))
 
         self.entry.response.headers['Content-Length'] = self.r.initial_limit / 2
         await self.r.after_headers(self.entry)
@@ -84,8 +84,8 @@ class IgnoreLargeBodyTest(TestCase):
     @async_test()
     async def test_no_not_read_full_once_statistics_are_obtained(self):
         for _ in range(1000):
-            await self.r.after_headers(Entry.create("http://example.om/test",
-                                                    response=StaticResponse(200, {'Content-Length': random.randint(10000, 20000)})))
+            response = StaticResponse(200, {'Content-Length': random.randint(10000, 20000)})
+            await self.r.after_headers(Entry.create("http://example.om/test", response=response))
 
         await self.r.after_headers(self.entry)
         self.assertLess(self.entry.result.read_length, self.r.initial_limit)
