@@ -100,7 +100,8 @@ class DetectSoft404:
         request = Entry.create(url)
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
         try:
-            simhash = Simhash(result.response.content, filter=self.match_filter, token_size=self.token_size).value
+            content = self._read_response(result.response)
+            simhash = Simhash(content, filter=self.match_filter, token_size=self.token_size).value
             return {"code": result.response.code, "content_simhash": simhash}
         except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
             return {"code": result.response.code, "raw_content_hash": hashlib.md5(result.response.raw).digest()}
@@ -111,12 +112,27 @@ class DetectSoft404:
                 return hashlib.md5(response.raw).digest() == soft_404_response["raw_content_hash"]
             else:
                 try:
-                    resp_hash = Simhash(response.content, filter=self.match_filter, token_size=self.token_size)
+                    content = self._read_response(response)
+                    resp_hash = Simhash(content, filter=self.match_filter, token_size=self.token_size)
                     return resp_hash.distance(Simhash(soft_404_response["content_simhash"])) < self.distance_threshold
                 except UnicodeDecodeError:  # response content is not text, cannot match text.
                     return False
         else:
             return False
+
+    def _read_response(self, response):
+        if response.truncated:
+            try:
+                return response.raw.decode("utf-8")
+            except UnicodeDecodeError as unicode_error:
+                # If error is due to a truncated character sequence at the end, ignore the error.
+                longest_bytes_sequence_in_utf8 = 4
+                if unicode_error.start >= len(response.raw) - longest_bytes_sequence_in_utf8:
+                    return response.raw.decode("utf-8", errors="ignore")
+                else:
+                    raise unicode_error
+        else:
+            return response.content
 
     def _extract_pattern_from_url(self, url):
         """Return the path part of the URL with the last element replaced with its pattern in a regex-like format:
