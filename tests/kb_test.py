@@ -38,7 +38,7 @@ class KnowledgeBaseTest(TestCase):
     def test_assign_entry_twice_causes_error(self):
         kb = KnowledgeBase()
         kb.random_entry = PieceOfData(123)
-        
+
         with self.assertRaises(AttributeError):
             kb.random_entry = PieceOfData(456)
 
