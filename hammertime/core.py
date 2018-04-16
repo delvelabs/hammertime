@@ -115,7 +115,8 @@ class HammerTime:
         for t in self.tasks:
             if not t.done():
                 t.cancel()
-        await asyncio.wait(self.tasks, loop=self.loop, return_when=asyncio.ALL_COMPLETED)
+        if len(self.tasks):
+            await asyncio.wait(self.tasks, loop=self.loop, return_when=asyncio.ALL_COMPLETED)
 
     async def close(self):
         if not self.is_closed:
