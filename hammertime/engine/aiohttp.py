@@ -50,7 +50,7 @@ class AioHttpEngine:
         try:
             await heuristics.before_request(entry)
             return await self._perform(entry, heuristics)
-        except (asyncio.TimeoutError, asyncio.CancelledError):
+        except asyncio.TimeoutError:
             await heuristics.on_timeout(entry)
             raise StopRequest("Timeout reached")
         except ClientOSError:

@@ -44,6 +44,7 @@ class HammerTime:
         self.closed = asyncio.Future(loop=loop)
         self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
         self._success_iterator = None
+        self._interrupted = False
 
     @property
     def completed_count(self):
@@ -110,13 +111,19 @@ class HammerTime:
         except Exception as e:
             logger.exception(e)
 
+    async def _cancel_tasks(self):
+        for t in self.tasks:
+            if not t.done():
+                t.cancel()
+        if len(self.tasks):
+            await asyncio.wait(self.tasks, loop=self.loop, return_when=asyncio.ALL_COMPLETED)
+
     async def close(self):
         if not self.is_closed:
+            await self._cancel_tasks()
             for t in self.tasks:
                 if t.done():
                     self._drain(t)
-                else:
-                    t.cancel()
 
             if self.request_engine is not None:
                 await self.request_engine.close()
@@ -126,7 +133,9 @@ class HammerTime:
         self.request_engine.set_proxy(proxy)
 
     def _interrupt(self):
-        asyncio.ensure_future(self.close(), loop=self.loop)
+        if not self._interrupted:
+            self._interrupted = True
+            asyncio.ensure_future(self.close(), loop=self.loop)
 
 
 class QueueIterator:
