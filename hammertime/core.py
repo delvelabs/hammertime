@@ -23,6 +23,7 @@ from collections import deque
 from .http import Entry
 from .ruleset import Heuristics, HammerTimeException
 from .engine import RetryEngine
+from .requestscheduler import RequestScheduler
 import signal
 
 
@@ -45,6 +46,7 @@ class HammerTime:
         self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
         self._success_iterator = None
         self._interrupted = False
+        self._request_scheduler = RequestScheduler(loop=loop)
 
     @property
     def completed_count(self):
@@ -66,7 +68,7 @@ class HammerTime:
             return future
 
         self.stats.requested += 1
-        task = self.loop.create_task(self._request(*args, **kwargs))
+        task = self._request_scheduler.request(self._request(*args, **kwargs))
         self.tasks.append(task)
         task.add_done_callback(self._on_completion)
         return task
