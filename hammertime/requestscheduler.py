@@ -17,14 +17,12 @@
 
 
 from asyncio import Future
-from asyncio.queues import Queue
 from collections import deque
 
 
 class RequestScheduler:
 
     def __init__(self, requests=None, *, loop, limit=1000):
-        self.done = Queue(loop=loop)
         self.loop = loop
         self.wait_queue = deque()
         self.pending_requests = []
@@ -83,11 +81,3 @@ class RequestScheduler:
                     task.cancel()
 
         return complete
-
-    async def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        while not self.done.empty() or len(self.pending_requests) > 0 or len(self.wait_queue) > 0:
-            return await self.done.get()
-        raise StopAsyncIteration()

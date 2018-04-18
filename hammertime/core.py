@@ -68,16 +68,15 @@ class HammerTime:
             return future
 
         self.stats.requested += 1
-        task = self._request_scheduler.request(self._request(*args, **kwargs))
-        self.tasks.append(task)
-        task.add_done_callback(self._on_completion)
-        return task
+        future = self._request_scheduler.request(self._request(*args, **kwargs))
+        self.tasks.append(future)
+        future.add_done_callback(self._on_completion)
+        return future
 
     async def _request(self, *args, **kwargs):
         try:
             entry = Entry.create(*args, **kwargs)
             entry = await self.request_engine.perform(entry, heuristics=self.heuristics)
-
             return entry
         except (HammerTimeException, asyncio.CancelledError):
             raise
@@ -95,37 +94,37 @@ class HammerTime:
                "You must call collect_successful_requests() prior to performing requests."
         return self._success_iterator
 
-    def _on_completion(self, task):
-        self._drain(task)
-        self.tasks.remove(task)
+    def _on_completion(self, future):
+        self._drain(future)
+        self.tasks.remove(future)
 
         if self._success_iterator:
             # Checking exception conditions explicitly to avoid using try/except blocks
-            entry = task.result() if not task.cancelled() and not task.exception() else None
+            entry = future.result() if not future.cancelled() and not future.exception() else None
 
             self._success_iterator.complete(entry)
 
-    def _drain(self, task):
+    def _drain(self, future):
         try:
-            task.result()
+            future.result()
         except (HammerTimeException, asyncio.CancelledError):
             pass
         except Exception as e:
             logger.exception(e)
 
     async def _cancel_tasks(self):
-        for t in self.tasks:
-            if not t.done():
-                t.cancel()
+        for future in self.tasks:
+            if not future.done():
+                future.cancel()
         if len(self.tasks):
             await asyncio.wait(self.tasks, loop=self.loop, return_when=asyncio.ALL_COMPLETED)
 
     async def close(self):
         if not self.is_closed:
             await self._cancel_tasks()
-            for t in self.tasks:
-                if t.done():
-                    self._drain(t)
+            for future in self.tasks:
+                if future.done():
+                    self._drain(future)
 
             if self.request_engine is not None:
                 await self.request_engine.close()
