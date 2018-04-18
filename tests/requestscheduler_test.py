@@ -41,23 +41,22 @@ class TestRequestScheduler(TestCase):
 
     def test_remove_scheduled_futures_from_wait_list(self):
         loop = MagicMock()
-        requests = [i for i in range(100)]
+        request_count = 100
+        requests = [i for i in range(request_count)]
         limit = 10
 
         scheduler = RequestScheduler(requests, loop=loop, limit=limit)
 
-        self.assertEqual(scheduler.wait_queue, deque(i for i in range(limit, 100)))
+        self.assertEqual(len(scheduler.wait_queue), request_count - limit)
 
     @async_test()
-    async def test_return_completed_task_and_remove_it_from_pending_tasks_list(self, loop):
+    async def test_remove_completed_task_from_pending_requests_list(self, loop):
         async def dummy_coro():
             await asyncio.sleep(0)
         request = dummy_coro()
-        scheduler = RequestScheduler([request], loop=loop)
-
-        async for _ in scheduler:
-            pass
-
+        scheduler = RequestScheduler(loop=loop)
+        future = scheduler.request(request)
+        await future
         self.assertEqual(len(scheduler.pending_requests), 0)
 
     @async_test()
@@ -68,15 +67,15 @@ class TestRequestScheduler(TestCase):
 
         result0 = asyncio.Future(loop=loop)
         result1 = asyncio.Future(loop=loop)
-        scheduler = RequestScheduler([dummy_coro(result0), dummy_coro(result1)], loop=loop, limit=2)
+        scheduler = RequestScheduler(loop=loop, limit=1)
+        future0 = scheduler.request(dummy_coro(result0))
+        future1 = scheduler.request(dummy_coro(result1))
         result0.set_result(None)
-        async for task in scheduler:
-            self.assertEqual(await task, result0)
-            break
+
+        self.assertEqual(await future0, result0)
         self.assertEqual(len(scheduler.wait_queue), 0)
         self.assertEqual(len(scheduler.pending_requests), 1)
 
         result1.set_result(None)
-        async for task in scheduler:
-            self.assertEqual(await task, result1)
+        self.assertEqual(await future1, result1)
         self.assertEqual(len(scheduler.pending_requests), 0)
