@@ -67,10 +67,11 @@ class RequestScheduler:
                 future.cancel()
             else:
                 exc = task.exception()
-                if exc:
-                    future.set_exception(exc)
-                else:
-                    future.set_result(task.result())
+                if not future.done():
+                    if exc:
+                        future.set_exception(exc)
+                    else:
+                        future.set_result(task.result())
     
         return complete
 
