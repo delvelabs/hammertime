@@ -45,6 +45,8 @@ class RequestScheduler:
                 request, future = self.wait_queue.popleft()
                 if not future.done():
                     self.schedule_request(request, future)
+                else:
+                    self._cancel_request(request)
             except IndexError:
                 return
 
@@ -82,3 +84,11 @@ class RequestScheduler:
                     task.cancel()
 
         return complete
+
+    def _cancel_request(self, request):
+        task = self.loop.create_task(request)
+        task.cancel()
+        try:
+            task.result()
+        except:
+            pass
