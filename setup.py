@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 
+from pip.req import parse_requirements
 from setuptools import setup
+
 
 version_file = "hammertime/__version__.py"
 version_data = {}
 with open(version_file) as f:
     code = compile(f.read(), version_file, 'exec')
     exec(code, globals(), version_data)
+
+reqs = [str(x.req) for x in parse_requirements('./requirements.txt', session=False)]
 
 setup(name='HammerTime-http',
       version=version_data['__version__'],
@@ -17,11 +21,6 @@ setup(name='HammerTime-http',
       packages=['hammertime',
                 'hammertime.engine',
                 'hammertime.rules'],
-      install_requires=[
-          'aiohttp',
-          'async_timeout',
-          'easyinject',
-          'simhash',
-      ],
+      install_requires=reqs,
       license="GPLv2"
      )
