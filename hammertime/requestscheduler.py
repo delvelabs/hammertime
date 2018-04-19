@@ -74,7 +74,7 @@ class RequestScheduler:
                         future.set_exception(exc)
                     else:
                         future.set_result(task.result())
-    
+
         return complete
 
     def _cancel_sub(self, task):
@@ -90,5 +90,5 @@ class RequestScheduler:
         task.cancel()
         try:
             task.result()
-        except:
+        except Exception:
             pass

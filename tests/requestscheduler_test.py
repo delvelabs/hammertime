@@ -17,7 +17,6 @@
 
 
 import asyncio
-from collections import deque
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 
