@@ -22,15 +22,11 @@ from collections import deque
 
 class RequestScheduler:
 
-    def __init__(self, requests=None, *, loop, limit=1000):
+    def __init__(self, *, loop, limit=1000):
         self.loop = loop
         self.wait_queue = deque()
         self.pending_requests = []
         self.max_simultaneous_requests = limit
-
-        for r in requests or []:
-            self.request(r, schedule=False)
-        self.schedule_max_possible_requests()
 
     def request(self, request, *, schedule=True):
         f = Future(loop=self.loop)
@@ -44,22 +40,22 @@ class RequestScheduler:
             try:
                 request, future = self.wait_queue.popleft()
                 if not future.done():
-                    self.schedule_request(request, future)
+                    self._schedule_request(request, future)
                 else:
                     self._cancel_request(request)
             except IndexError:
                 return
 
-    def schedule_request(self, request, future=None):
+    def _schedule_request(self, request, future=None):
         task = self.loop.create_task(request)
-        task.add_done_callback(self.on_completion)
+        task.add_done_callback(self._on_completion)
         self.pending_requests.append(task)
 
         if future:
             task.add_done_callback(self._update_future(future))
             future.add_done_callback(self._cancel_sub(task))
 
-    def on_completion(self, task):
+    def _on_completion(self, task):
         self.pending_requests.remove(task)
         self.schedule_max_possible_requests()
 

@@ -32,7 +32,9 @@ class TestRequestScheduler(TestCase):
         limit = 10
         loop.create_task = MagicMock(return_value=MagicMock())
 
-        scheduler = RequestScheduler(requests, loop=loop, limit=limit)
+        scheduler = RequestScheduler(loop=loop, limit=limit)
+        for request in requests:
+            scheduler.request(request)
 
         expected = [call(i) for i in range(limit)]
         loop.create_task.assert_has_calls(expected)
@@ -44,7 +46,9 @@ class TestRequestScheduler(TestCase):
         requests = [i for i in range(request_count)]
         limit = 10
 
-        scheduler = RequestScheduler(requests, loop=loop, limit=limit)
+        scheduler = RequestScheduler(loop=loop, limit=limit)
+        for request in requests:
+            scheduler.request(request)
 
         self.assertEqual(len(scheduler.wait_queue), request_count - limit)
 
