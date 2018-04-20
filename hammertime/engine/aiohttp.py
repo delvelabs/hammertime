@@ -15,13 +15,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import asyncio
-from async_timeout import timeout
 
 from aiohttp import ClientSession
+from aiohttp import ClientSSLError
 from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
-from aiohttp.connector import TCPConnector
-from aiohttp.helpers import DummyCookieJar
+from aiohttp.cookiejar import DummyCookieJar
+import asyncio
+from async_timeout import timeout
 import ssl
 
 from ..ruleset import StopRequest, RejectRequest
@@ -34,17 +34,22 @@ class AioHttpEngine:
         self.loop = loop
         self.session = client_session
         if self.session is None:
-            ssl_context = None
-            if ca_certificate_file is not None:
-                ssl_context = ssl.create_default_context()
-                ssl_context.load_verify_locations(cafile=ca_certificate_file)
-            connector = TCPConnector(loop=loop, verify_ssl=verify_ssl, ssl_context=ssl_context)
             if disable_cookies:
-                self.session = ClientSession(loop=loop, connector=connector, cookie_jar=DummyCookieJar(loop=loop))
+                self.session = ClientSession(loop=loop, cookie_jar=DummyCookieJar(loop=loop))
             else:
-                self.session = ClientSession(loop=loop, connector=connector)
+                self.session = ClientSession(loop=loop)
         self.proxy = proxy
         self.timeout = timeout
+        self.ssl = None
+        self.set_ssl_parameters(verify_ssl=verify_ssl, ca_certificate_file=ca_certificate_file)
+
+    def set_ssl_parameters(self, *, verify_ssl=True, ca_certificate_file=None):
+        if ca_certificate_file:
+            self.ssl = ssl.create_default_context(cafile=ca_certificate_file)
+        elif not verify_ssl:
+            self.ssl = verify_ssl
+        else:
+            self.ssl = None
 
     async def perform(self, entry, heuristics):
         try:
@@ -53,6 +58,8 @@ class AioHttpEngine:
         except asyncio.TimeoutError:
             await heuristics.on_timeout(entry)
             raise StopRequest("Timeout reached")
+        except ClientSSLError:
+            raise
         except ClientOSError:
             await heuristics.on_host_unreachable(entry)
             raise StopRequest("Host Unreachable")
@@ -76,7 +83,7 @@ class AioHttpEngine:
                 extra_args["headers"] = entry.request.headers
 
             response = await self.session.request(method=req.method, url=req.url, allow_redirects=False,
-                                                  timeout=timeout_value, **extra_args)
+                                                  timeout=timeout_value, ssl=self.ssl, **extra_args)
 
         # When the request is simply rejected, we want to keep the persistent connection alive
         async with ProtectedSession(response, RejectRequest):
@@ -94,7 +101,7 @@ class AioHttpEngine:
         return entry
 
     async def close(self):
-        self.session.close()
+        await self.session.close()
 
     def set_proxy(self, proxy):
         self.proxy = proxy
