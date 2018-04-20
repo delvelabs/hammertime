@@ -19,7 +19,7 @@ setup(name='HammerTime-http',
                 'hammertime.engine',
                 'hammertime.rules'],
       install_requires=[
-          'aiohttp>=3.0.0,<3.2.0',
+          'aiohttp>=3.1.0,<3.2.0',
           'easyinject==0.3',
           'aiodns==1.1.1',
           'simhash==1.8.0'
