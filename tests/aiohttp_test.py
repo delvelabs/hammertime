@@ -40,7 +40,7 @@ class TestAioHttpEngine(TestCase):
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=0.2, proxy="http://some.proxy.com/",
-                                                       allow_redirects=False)
+                                                       allow_redirects=False, ssl=None)
 
     @async_test()
     async def test_set_proxy(self, loop):
@@ -52,20 +52,44 @@ class TestAioHttpEngine(TestCase):
         self.assertEqual(engine.proxy, proxy_address)
 
     @async_test()
-    async def test_constructor_create_client_session_with_connector_with_specified_verify_ssl_value(self):
-        engine_verify_ssl = AioHttpEngine(loop=None, verify_ssl=True)
-        engine_dont_verify_ssl = AioHttpEngine(loop=None, verify_ssl=False)
+    async def test_default_ssl_parameters(self, loop):
+        engine = AioHttpEngine(loop=loop)
+        engine.session.request = make_mocked_coro(return_value=FakeResponse())
+        entry = Entry.create("http://www.example.com/")
 
-        self.assertTrue(engine_verify_ssl.session.connector.verify_ssl)
-        self.assertFalse(engine_dont_verify_ssl.session.connector.verify_ssl)
+        await engine.perform(entry, Heuristics())
+
+        engine.session.request.assert_called_once_with(method=entry.request.method, url=entry.request.url,
+                                                       allow_redirects=False, timeout=0.2, ssl=None)
+
 
     @async_test()
-    async def test_constructor_load_certification_authority_certificate_in_session_ssl_context(self):
-        with patch("ssl.SSLContext.load_verify_locations", MagicMock()):
-            engine = AioHttpEngine(loop=None, ca_certificate_file="certificate.cer")
+    async def test_set_ssl_parameters_set_certification_authority_certificate(self, loop):
+        ssl_context = "ssl_context"
+        with patch("ssl.create_default_context", MagicMock(return_value=ssl_context)) as create_default_context:
+            engine = AioHttpEngine(loop=loop)
+            engine.session.request = make_mocked_coro(return_value=FakeResponse())
+            entry = Entry.create("http://www.example.com/")
 
-            load_verify_locations = engine.session.connector.ssl_context.load_verify_locations
-            load_verify_locations.assert_called_once_with(cafile="certificate.cer")
+            engine.set_ssl_parameters(ca_certificate_file="certificate.cer")
+            await engine.perform(entry, Heuristics())
+
+            engine.session.request.assert_called_once_with(method=entry.request.method, url=entry.request.url,
+                                                           allow_redirects=False, timeout=0.2, ssl=ssl_context)
+            create_default_context.assert_called_once_with(cafile="certificate.cer")
+
+    @async_test()
+    async def test_set_ssl_parameters_dont_verify_ssl(self, loop):
+        engine = AioHttpEngine(loop=loop)
+        engine.session.request = make_mocked_coro(return_value=FakeResponse())
+        entry = Entry.create("http://www.example.com/")
+
+        engine.set_ssl_parameters(verify_ssl=False)
+        await engine.perform(entry, Heuristics())
+
+        engine.session.request.assert_called_once_with(method=entry.request.method, url=entry.request.url,
+                                                       allow_redirects=False, timeout=0.2, ssl=False)
+
 
     @async_test()
     async def test_perform_use_timeout_of_entry_if_not_none(self, loop):
@@ -78,7 +102,7 @@ class TestAioHttpEngine(TestCase):
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=10, proxy="http://some.proxy.com/",
-                                                       allow_redirects=False)
+                                                       allow_redirects=False, ssl=None)
 
     @async_test()
     async def test_specify_header(self, loop):
@@ -91,7 +115,7 @@ class TestAioHttpEngine(TestCase):
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url="http://www.example.com/1",
                                                        timeout=ANY, allow_redirects=False,
-                                                       headers={"User-Agent": "Hammertime 1.2.3"})
+                                                       headers={"User-Agent": "Hammertime 1.2.3"}, ssl=None)
 
 
 class TestResponse(TestCase):
