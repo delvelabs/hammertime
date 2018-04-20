@@ -62,7 +62,6 @@ class TestAioHttpEngine(TestCase):
         engine.session.request.assert_called_once_with(method=entry.request.method, url=entry.request.url,
                                                        allow_redirects=False, timeout=0.2, ssl=None)
 
-
     @async_test()
     async def test_set_ssl_parameters_set_certification_authority_certificate(self, loop):
         ssl_context = "ssl_context"
@@ -89,7 +88,6 @@ class TestAioHttpEngine(TestCase):
 
         engine.session.request.assert_called_once_with(method=entry.request.method, url=entry.request.url,
                                                        allow_redirects=False, timeout=0.2, ssl=False)
-
 
     @async_test()
     async def test_perform_use_timeout_of_entry_if_not_none(self, loop):
