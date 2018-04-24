@@ -59,7 +59,7 @@ class AioHttpEngine:
             await heuristics.on_timeout(entry)
             raise StopRequest("Timeout reached")
         except ClientSSLError:
-            raise
+            raise StopRequest("SSL Error")
         except ClientOSError:
             await heuristics.on_host_unreachable(entry)
             raise StopRequest("Host Unreachable")
