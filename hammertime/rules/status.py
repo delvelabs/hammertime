@@ -64,7 +64,7 @@ class DetectSoft404:
     def set_child_heuristics(self, heuristics):
         self.child_heuristics = heuristics
 
-    async def after_response(self, entry):
+    async def on_request_successful(self, entry):
         if entry.response.code != 200:
             entry.result.soft404 = False
         else:
@@ -196,6 +196,6 @@ class DetectSoft404:
 
 class RejectSoft404:
 
-    async def after_response(self, entry):
+    async def on_request_successful(self, entry):
         if entry.result.soft404:
             raise RejectRequest("Response to %s is a soft 404." % entry.request)

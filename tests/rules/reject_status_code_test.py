@@ -88,18 +88,18 @@ class TestDetectSoft404(TestCase):
                 patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
 
             for url, alternate_url in zip(urls, alternate_urls):
-                await self.rule.after_response(self.create_entry(self.host + url))
+                await self.rule.on_request_successful(self.create_entry(self.host + url))
                 self.assertRequested(self.host + alternate_url)
 
     @async_test()
     async def test_calls_not_made_second_time_around(self):
         entry = self.create_entry("http://example.com/test", response_content="response")
         self.engine.mock.perform_high_priority.return_value = entry
-        await self.rule.after_response(self.create_entry("http://example.com/test"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
 
         self.engine.mock.reset_mock()
 
-        await self.rule.after_response(self.create_entry("http://example.com/test"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
 
         self.engine.mock.perform_high_priority.assert_not_called()
 
@@ -107,7 +107,7 @@ class TestDetectSoft404(TestCase):
     async def test_remove_lock_if_stop_request_raised(self):
         self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
 
-        await self.rule.after_response(self.create_entry("http://example.com/test"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
 
         self.assertEqual(self.rule.performed["http://example.com/"]["/\l"], None)
 
@@ -117,10 +117,10 @@ class TestDetectSoft404(TestCase):
         response.content = "response content"
         self.engine.response = response
 
-        await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
-        await self.rule.after_response(self.create_entry("http://example.com/123/", response_content="response"))
-        await self.rule.after_response(self.create_entry("http://example.com/.test", response_content="response"))
-        await self.rule.after_response(self.create_entry("http://example.com/123/test.js", response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/123/", response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/.test", response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/123/test.js", response_content="response"))
 
         simhash = Simhash(response.content).value
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
@@ -133,7 +133,7 @@ class TestDetectSoft404(TestCase):
     async def test_add_None_to_knowledge_base_if_request_failed(self):
         self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
 
-        await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {"/\l": None})
 
@@ -144,7 +144,7 @@ class TestDetectSoft404(TestCase):
         sample_response.set_content(bytes, True)
         self.engine.response = sample_response
 
-        await self.rule.after_response(self.create_entry("http://example.com/test", response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
                 "/\l": {"code": 200, "raw_content_hash": hashlib.md5(bytes).digest()}})
@@ -160,7 +160,7 @@ class TestDetectSoft404(TestCase):
                                                                   "/abc/.test.js"]]
         entries = [self.create_entry(url) for url in urls]
         for entry in entries:
-            await self.rule.after_response(entry)
+            await self.rule.on_request_successful(entry)
 
         self.assertTrue(all(entry.result.soft404 for entry in entries))
 
@@ -175,7 +175,7 @@ class TestDetectSoft404(TestCase):
                    self.create_entry("http://example.com/.test", response_content="test"),
                    self.create_entry("http://example.com/test.php", response_content="test")]
         for entry in entries:
-            await self.rule.after_response(entry)
+            await self.rule.on_request_successful(entry)
 
         self.assertFalse(any(entry.result.soft404 for entry in entries))
 
@@ -185,7 +185,7 @@ class TestDetectSoft404(TestCase):
         self.rule.performed["http://example.com/"] = {"/\l": None}
         entry = self.create_entry("http://example.com/test", response_content="test")
 
-        await self.rule.after_response(entry)
+        await self.rule.on_request_successful(entry)
 
         self.assertFalse(entry.result.soft404)
 
@@ -199,7 +199,7 @@ class TestDetectSoft404(TestCase):
         response.set_content(raw, True)
         entry = Entry.create("http://example.com/test", response=response)
 
-        await self.rule.after_response(entry)
+        await self.rule.on_request_successful(entry)
 
         self.assertTrue(entry.result.soft404)
 
@@ -218,16 +218,16 @@ class TestDetectSoft404(TestCase):
             self.rule.performed["http://example.com/"] = {pattern: None}
         entry = self.create_entry("http://example.com/", response_content="home page")
 
-        await self.rule.after_response(entry)
+        await self.rule.on_request_successful(entry)
 
         self.assertFalse(entry.result.soft404)
 
     @async_test()
-    async def test_after_response_skip_sample_and_mark_entry_as_not_soft404_if_response_code_is_not_200(self):
+    async def test_on_request_successful(self):
         entry = Entry.create("http://example.com/", response=StaticResponse(403, {}))
         self.rule.get_soft_404_sample = make_mocked_coro()
 
-        await self.rule.after_response(entry)
+        await self.rule.on_request_successful(entry)
 
         self.rule.get_soft_404_sample.assert_not_called()
         self.assertFalse(entry.result.soft404)
