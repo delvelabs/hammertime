@@ -81,6 +81,16 @@ class TestRejectCatchAllRedirect(TestCase):
             await self.heuristic.after_headers(initial_request)
 
     @async_test()
+    async def test_ignore_when_path_is_present_in_redirect(self):
+        initial_request = self.create_redirected_request("/admin/a.php", redirected_to="/404.php?path=/admin/a.php")
+        returned_entry = self.create_redirected_request("/admin/uuid", redirected_to="/404.php?path=/admin/uuid")
+        self.fake_engine.perform_high_priority = make_mocked_coro(return_value=returned_entry)
+
+        with self.assertRaises(RejectRequest):
+            with patch("hammertime.rules.redirects.uuid4", MagicMock(return_value="uuid")):
+                await self.heuristic.after_headers(initial_request)
+
+    @async_test()
     async def test_before_request_accept_request_if_random_file_not_redirected_to_same_path_as_initial_request(self):
         initial_request = self.create_redirected_request("/admin/resource.php", redirected_to="/admin/login.php")
         returned_entry = self.create_redirected_request("/admin/uuid", redirected_to="/catchAll.html")

@@ -91,17 +91,26 @@ class RejectCatchAllRedirect:
     async def after_headers(self, entry):
         if entry.response.code in valid_redirects and "location" in entry.response.headers:
             url = entry.request.url
+            path = self._get_url_with_base_path(url)
+            random_url = self._build_random_url(path)
             redirect_for_request = self._to_absolute_url(url, entry.response.headers["location"])
-            default_redirect_for_path = await self._get_default_redirect_for_path(self._get_path(url))
-            if redirect_for_request == default_redirect_for_path:
+            default_redirect_for_path = await self._get_default_redirect_for_path(path, random_url)
+
+            # Some catch-all redirects include the current path in the requested location.
+            # Classic examples:
+            # - Adding a slash
+            # - error.php?src=/origin
+            norm_request = self._normalize(redirect_for_request, url)
+            norm_default = self._normalize(default_redirect_for_path, random_url)
+
+            if norm_request == norm_default:
                 raise RejectRequest("Catch-all redirect rejected: {} redirected to {}".format(
                     url, default_redirect_for_path))
 
-    async def _get_default_redirect_for_path(self, path):
+    async def _get_default_redirect_for_path(self, path, random_url):
         if path in self.redirects:
             return self.redirects[path]
         else:
-            random_url = self._build_random_url(path)
             _entry = await self.engine.perform_high_priority(Entry.create(random_url), self.child_heuristics)
             if _entry.response.code in valid_redirects:
                 try:
@@ -112,7 +121,7 @@ class RejectCatchAllRedirect:
                     pass
             return None
 
-    def _get_path(self, complete_url):
+    def _get_url_with_base_path(self, complete_url):
         path = urlparse(complete_url).path
         path_parts = path.split("/")[:-1]
         path = "/".join(path_parts) + "/"
@@ -121,6 +130,13 @@ class RejectCatchAllRedirect:
     def _build_random_url(self, base_path):
         random_path = base_path + str(uuid4())
         return random_path
+
+    def _normalize(self, redirect_url, initial_url):
+        if redirect_url:
+            path = urlparse(initial_url).path
+            return redirect_url.replace(path, '_REQUESTED_')
+        else:
+            return None
 
     def _add_redirect_to_kb(self, requested_path, redirect_url):
         if requested_path not in self.redirects:

@@ -117,10 +117,14 @@ class TestDetectSoft404(TestCase):
         response.content = "response content"
         self.engine.response = response
 
-        await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
-        await self.rule.on_request_successful(self.create_entry("http://example.com/123/", response_content="response"))
-        await self.rule.on_request_successful(self.create_entry("http://example.com/.test", response_content="response"))
-        await self.rule.on_request_successful(self.create_entry("http://example.com/123/test.js", response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/test",
+                                                                response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/123/",
+                                                                response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/.test",
+                                                                response_content="response"))
+        await self.rule.on_request_successful(self.create_entry("http://example.com/123/test.js",
+                                                                response_content="response"))
 
         simhash = Simhash(response.content).value
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
