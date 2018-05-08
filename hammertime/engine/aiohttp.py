@@ -18,7 +18,7 @@
 
 from aiohttp import ClientSession
 from aiohttp import ClientSSLError
-from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError
+from aiohttp.client_exceptions import ClientOSError, ClientResponseError, ServerDisconnectedError, ClientError
 from aiohttp.cookiejar import DummyCookieJar
 import asyncio
 from async_timeout import timeout
@@ -67,6 +67,8 @@ class AioHttpEngine:
             raise StopRequest("Connection Error")
         except ServerDisconnectedError:
             raise StopRequest("Server Disconnected")
+        except ClientError as e:
+            raise StopRequest(str(e))
         # If request is cancelled, it raises a KeyError. If session is closed, session.request raises a RuntimeError.
         except (KeyError, RuntimeError, asyncio.CancelledError):
             raise asyncio.CancelledError
