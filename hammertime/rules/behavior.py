@@ -21,7 +21,9 @@ from hammertime.rules.simhash import Simhash, DEFAULT_FILTER
 
 class DetectBehaviorChange:
 
-    def __init__(self, buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, token_size=4):
+    def __init__(self, buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, token_size=4,
+                 safe_status_codes=None):
+        self.safe_status_codes = safe_status_codes or {401, 403, 404}
         self.previous_responses = []
         self.max_buffer_size = buffer_size
         self.error_behavior = False
@@ -36,6 +38,10 @@ class DetectBehaviorChange:
         self.previous_responses = kb.behavior_buffer
 
     async def after_response(self, entry):
+        if entry.response.code in self.safe_status_codes:
+            entry.result.error_behavior = False
+            return
+
         resp_content = self._read_content(entry.response)
         content_simhash = self._hash(resp_content)
         if len(self.previous_responses) >= self.max_buffer_size:

@@ -27,18 +27,18 @@ from tests.fixtures import async_test
 class TestRejectSoft404(TestCase):
 
     @async_test()
-    async def test_after_response_raise_reject_request_if_entry_is_flagged_as_soft404(self):
+    async def test_on_request_successful_raise_reject_request_if_entry_is_flagged_as_soft404(self):
         reject_soft404 = RejectSoft404()
         entry = Entry.create("http://example.com/junk.html")
         entry.result.soft404 = True
 
         with self.assertRaises(RejectRequest):
-            await reject_soft404.after_response(entry)
+            await reject_soft404.on_request_successful(entry)
 
     @async_test()
-    async def test_after_response_does_not_raise_if_entry_is_not_flagged_as_soft404(self):
+    async def test_on_request_successful_does_not_raise_if_entry_is_not_flagged_as_soft404(self):
         reject_soft404 = RejectSoft404()
         entry = Entry.create("http://example.com/junk.html")
         entry.result.soft404 = False
 
-        await reject_soft404.after_response(entry)
+        await reject_soft404.on_request_successful(entry)

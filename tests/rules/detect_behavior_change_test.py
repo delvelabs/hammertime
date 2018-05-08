@@ -78,6 +78,16 @@ class TestDetectBehaviorChange(TestCase):
         self.assertTrue(self.behavior_detection.error_behavior)
 
     @async_test()
+    async def test_safe_code_does_not_trigger_error(self):
+        self.entry.response.code = 404
+        self.kb.behavior_buffer.extend(["data"] * 10)
+
+        await self.behavior_detection.after_response(self.entry)
+
+        self.assertFalse(self.entry.result.error_behavior)
+        self.assertFalse(self.behavior_detection.error_behavior)
+
+    @async_test()
     async def test_after_response_dont_set_flag_in_entry_result_if_normal_behavior_restored(self):
         self.kb.behavior_buffer.extend(["test"] * 10)
         self.behavior_detection.error_behavior = True
