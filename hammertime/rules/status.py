@@ -101,9 +101,12 @@ class DetectSoft404:
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
         try:
             simhash = Simhash(result.response.content, filter=self.match_filter, token_size=self.token_size).value
-            return {"code": result.response.code, "content_simhash": simhash, "raw_content_hash": self._hash(result.response)}
+            return {"code": result.response.code,
+                    "content_simhash": simhash,
+                    "raw_content_hash": self._hash(result.response)}
         except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
-            return {"code": result.response.code, "raw_content_hash": self._hash(result.response)}
+            return {"code": result.response.code,
+                    "raw_content_hash": self._hash(result.response)}
 
     def _match(self, response, soft_404_response):
         if soft_404_response["code"] == response.code:
