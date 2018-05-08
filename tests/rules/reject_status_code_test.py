@@ -127,11 +127,12 @@ class TestDetectSoft404(TestCase):
                                                                 response_content="response"))
 
         simhash = Simhash(response.content).value
+        raw = self.rule._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-            "/\l": {"code": 200, "content_simhash": simhash},
-            "/\d/": {"code": 200, "content_simhash": simhash},
-            "/.\l": {"code": 200, "content_simhash": simhash},
-            "/123/\l.js": {"code": 200, "content_simhash": simhash}})
+            "/\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw},
+            "/\d/": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw},
+            "/.\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw},
+            "/123/\l.js": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw}})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):

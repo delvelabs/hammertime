@@ -101,22 +101,28 @@ class DetectSoft404:
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
         try:
             simhash = Simhash(result.response.content, filter=self.match_filter, token_size=self.token_size).value
-            return {"code": result.response.code, "content_simhash": simhash}
+            return {"code": result.response.code, "content_simhash": simhash, "raw_content_hash": self._hash(result.response)}
         except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
-            return {"code": result.response.code, "raw_content_hash": hashlib.md5(result.response.raw).digest()}
+            return {"code": result.response.code, "raw_content_hash": self._hash(result.response)}
 
     def _match(self, response, soft_404_response):
         if soft_404_response["code"] == response.code:
             if "raw_content_hash" in soft_404_response:
-                return hashlib.md5(response.raw).digest() == soft_404_response["raw_content_hash"]
-            else:
+                if self._hash(response) == soft_404_response["raw_content_hash"]:
+                    return True
+
+            if "content_simhash" in soft_404_response:
                 try:
                     resp_hash = Simhash(response.content, filter=self.match_filter, token_size=self.token_size)
-                    return resp_hash.distance(Simhash(soft_404_response["content_simhash"])) < self.distance_threshold
+                    distance = resp_hash.distance(Simhash(soft_404_response["content_simhash"]))
+                    return distance < self.distance_threshold
                 except UnicodeDecodeError:  # response content is not text, cannot match text.
                     return False
         else:
             return False
+
+    def _hash(self, response):
+        return hashlib.md5(response.raw).digest()
 
     def _extract_pattern_from_url(self, url):
         """Return the path part of the URL with the last element replaced with its pattern in a regex-like format:
