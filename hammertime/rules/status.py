@@ -15,11 +15,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 import asyncio
 from urllib.parse import urljoin, urlparse
 import os
 from collections import defaultdict
+from difflib import SequenceMatcher
 import re
 import random
 import string
@@ -44,13 +44,14 @@ class RejectStatusCode:
 
 class DetectSoft404:
 
-    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4):
+    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4, sample_length=5120):
         self.engine = None
         self.performed = defaultdict(dict)
         self.soft_404_responses = defaultdict(dict)
         self.distance_threshold = distance_threshold
         self.match_filter = match_filter
         self.token_size = token_size
+        self.sample_length = sample_length
 
     def set_engine(self, engine):
         self.engine = engine
@@ -100,13 +101,15 @@ class DetectSoft404:
         request = Entry.create(url)
         result = await self.engine.perform_high_priority(request, self.child_heuristics)
         try:
-            simhash = Simhash(result.response.content, filter=self.match_filter, token_size=self.token_size).value
+            simhash = self._simhash(result.response)
             return {"code": result.response.code,
                     "content_simhash": simhash,
-                    "raw_content_hash": self._hash(result.response)}
+                    "raw_content_hash": self._hash(result.response),
+                    "content_sample": self._sample(result.response)}
         except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
             return {"code": result.response.code,
-                    "raw_content_hash": self._hash(result.response)}
+                    "raw_content_hash": self._hash(result.response),
+                    "content_sample": self._sample(result.response)}
 
     def _match(self, response, soft_404_response):
         if soft_404_response["code"] == response.code:
@@ -116,16 +119,31 @@ class DetectSoft404:
 
             if "content_simhash" in soft_404_response:
                 try:
-                    resp_hash = Simhash(response.content, filter=self.match_filter, token_size=self.token_size)
+                    resp_hash = Simhash(self._simhash(response))
                     distance = resp_hash.distance(Simhash(soft_404_response["content_simhash"]))
-                    return distance < self.distance_threshold
+                    if distance < self.distance_threshold:
+                        return True
                 except UnicodeDecodeError:  # response content is not text, cannot match text.
-                    return False
-        else:
-            return False
+                    pass
+
+            if self.sample_length and "content_sample" in soft_404_response:
+                sample = self._sample(response)
+                matcher = SequenceMatcher(isjunk=None, a=soft_404_response["content_sample"], b=sample, autojunk=False)
+
+                # This content is almost similar to a generated 404, therefore it's a 404.
+                if matcher.ratio() > 0.8:
+                    return True
+
+        return False
 
     def _hash(self, response):
         return hashlib.md5(response.raw).digest()
+
+    def _simhash(self, response):
+        return Simhash(response.content, filter=self.match_filter, token_size=self.token_size).value
+
+    def _sample(self, response):
+        return response.raw[0:self.sample_length]
 
     def _extract_pattern_from_url(self, url):
         """Return the path part of the URL with the last element replaced with its pattern in a regex-like format:

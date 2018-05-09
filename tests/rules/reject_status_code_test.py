@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, ANY
 from urllib.parse import urljoin, urlparse
 import re
 import uuid
@@ -129,10 +129,10 @@ class TestDetectSoft404(TestCase):
         simhash = Simhash(response.content).value
         raw = self.rule._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-            "/\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw},
-            "/\d/": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw},
-            "/.\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw},
-            "/123/\l.js": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw}})
+            "/\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY},
+            "/\d/": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY},
+            "/.\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY},
+            "/123/\l.js": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY}})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):
@@ -152,7 +152,7 @@ class TestDetectSoft404(TestCase):
         await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-                "/\l": {"code": 200, "raw_content_hash": hashlib.md5(bytes).digest()}})
+                "/\l": {"code": 200, "raw_content_hash": hashlib.md5(bytes).digest(), "content_sample": ANY}})
 
     @async_test()
     async def test_mark_request_has_soft404_if_pattern_and_response_match_request_in_knowledge_base(self):
