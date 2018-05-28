@@ -293,6 +293,14 @@ class TestDetectSoft404(TestCase):
             self.assertTrue(result.startswith(base_url))
             self.assertIsNotNone(re.match(regex, urlparse(result).path))
 
+    def test_obtain_potentially_valid_parent_paths(self):
+        self.assertIn("http://example.com/admin/",
+                      list(self.rule.enumerate_candidates("http://example.com/admin/file.txt")))
+        self.assertIn("http://example.com/admin/much/",
+                      list(self.rule.enumerate_candidates("http://example.com/admin/much/longer/path")))
+        self.assertIn("http://example.com/admin/much",
+                      list(self.rule.enumerate_candidates("http://example.com/admin/much/longer/path")))
+
     def create_entry(self, url, response_code=200, response_content="response content"):
         response = StaticResponse(response_code, {}, response_content)
         return Entry.create(url, response=response)

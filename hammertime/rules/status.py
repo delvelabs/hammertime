@@ -71,17 +71,34 @@ class DetectSoft404:
             # However this makes no sense when the server tells us it does not exist, so skil this case.
             entry.result.soft404 = False
         else:
-            soft_404_response = await self.get_soft_404_sample(entry.request.url)
-            if soft_404_response is not None and self._match(entry.response, soft_404_response):
-                entry.result.soft404 = True
-            else:
-                entry.result.soft404 = False
+            entry.result.soft404 = await self.is_soft_404(entry.request.url, entry.response)
 
-    async def get_soft_404_sample(self, url):
+    async def is_soft_404(self, url, response):
+        # Before fetching a new 404 sample for a specific path, verify if the currently
+        # obtained paths do not already have a matching sample. This will avoid multiple
+        # requests per sub-path and extension when a catch-all already exists.
+        for potential_target in self.enumerate_candidates(url):
+            candidate = await self.get_soft_404_sample(potential_target, fetch_missing=False)
+            if self._match(response, candidate):
+                return True
+
+        # Fully perform, fetching as required
+        soft_404_response = await self.get_soft_404_sample(url)
+        return self._match(response, soft_404_response)
+
+    async def get_soft_404_sample(self, url, *, fetch_missing=True):
         server_address = urljoin(url, "/")
         if url == server_address:  # skip home page.
             return None
+
+        # If we have a match, leave right away
         request_url_pattern = self._extract_pattern_from_url(url)
+        if request_url_pattern in self.soft_404_responses[server_address]:
+            return self.soft_404_responses[server_address][request_url_pattern]
+
+        if not fetch_missing:
+            return None
+
         if request_url_pattern not in self.performed[server_address]:
             try:
                 # Temporarily assign a future to make sure work is not done twice
@@ -113,7 +130,18 @@ class DetectSoft404:
                     "raw_content_hash": self._hash(result.response),
                     "content_sample": self._sample(result.response)}
 
+    def enumerate_candidates(self, url):
+        parts = urlparse(url)
+        path = parts.path
+        while len(path) > 1:
+            yield urljoin(url, path)
+            yield urljoin(url, path) + "/"
+            path, _ = os.path.split(path)
+
     def _match(self, response, soft_404_response):
+        if soft_404_response is None:
+            return False
+
         if soft_404_response["code"] == response.code:
             if "raw_content_hash" in soft_404_response:
                 if self._hash(response) == soft_404_response["raw_content_hash"]:
