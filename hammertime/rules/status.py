@@ -66,7 +66,9 @@ class DetectSoft404:
         self.child_heuristics = heuristics
 
     async def on_request_successful(self, entry):
-        if entry.response.code != 200:
+        if entry.response.code == 404:
+            # We want to apply this logic to any URI that provides the same output regardless of the path provided.
+            # However this makes no sense when the server tells us it does not exist, so skil this case.
             entry.result.soft404 = False
         else:
             soft_404_response = await self.get_soft_404_sample(entry.request.url)

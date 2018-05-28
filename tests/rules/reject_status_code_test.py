@@ -229,7 +229,7 @@ class TestDetectSoft404(TestCase):
 
     @async_test()
     async def test_on_request_successful(self):
-        entry = Entry.create("http://example.com/", response=StaticResponse(403, {}))
+        entry = Entry.create("http://example.com/", response=StaticResponse(404, {}))
         self.rule.get_soft_404_sample = make_mocked_coro()
 
         await self.rule.on_request_successful(entry)
