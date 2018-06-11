@@ -44,7 +44,8 @@ class RejectStatusCode:
 
 class DetectSoft404:
 
-    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4, sample_length=5120):
+    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4, sample_length=5120,
+                 collect_retry_delay=5.0):
         self.engine = None
         self.performed = defaultdict(dict)
         self.soft_404_responses = defaultdict(dict)
@@ -52,6 +53,7 @@ class DetectSoft404:
         self.match_filter = match_filter
         self.token_size = token_size
         self.sample_length = sample_length
+        self.collect_retry_delay = collect_retry_delay
 
     def set_engine(self, engine):
         self.engine = engine
@@ -105,7 +107,7 @@ class DetectSoft404:
                 self.performed[server_address][request_url_pattern] = asyncio.Future()
                 response = await self._collect_sample(url, request_url_pattern)
                 self.soft_404_responses[server_address][request_url_pattern] = response
-            except (StopRequest, RejectRequest):
+            except (StopRequest, RejectRequest) as e:
                 self.soft_404_responses[server_address][request_url_pattern] = None
             finally:
                 # Remove the wait lock
@@ -116,19 +118,33 @@ class DetectSoft404:
         return self.soft_404_responses[server_address][request_url_pattern]
 
     async def _collect_sample(self, url, url_pattern):
+        """
+        Sample collection is meant to be very tolerant to generic failures as failing to
+        obtain the sample has important consequences on the results.
+
+        - Multiple retries with longer delays
+        - Larger than usual timeout
+        """
         url = self._create_random_url(url, url_pattern)
-        request = Entry.create(url)
-        result = await self.engine.perform_high_priority(request, self.child_heuristics)
-        try:
-            simhash = self._simhash(result.response)
-            return {"code": result.response.code,
-                    "content_simhash": simhash,
-                    "raw_content_hash": self._hash(result.response),
-                    "content_sample": self._sample(result.response)}
-        except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
-            return {"code": result.response.code,
-                    "raw_content_hash": self._hash(result.response),
-                    "content_sample": self._sample(result.response)}
+        for x in range(5):
+            try:
+                request = Entry.create(url, arguments={"timeout": 10})
+                result = await self.engine.perform_high_priority(request, self.child_heuristics)
+
+                try:
+                    simhash = self._simhash(result.response)
+                    return {"code": result.response.code,
+                            "content_simhash": simhash,
+                            "raw_content_hash": self._hash(result.response),
+                            "content_sample": self._sample(result.response)}
+                except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
+                    return {"code": result.response.code,
+                            "raw_content_hash": self._hash(result.response),
+                            "content_sample": self._sample(result.response)}
+            except StopRequest:
+                await asyncio.sleep(self.collect_retry_delay)
+
+        raise StopRequest("Impossible to obtain sample")
 
     def enumerate_candidates(self, url):
         parts = urlparse(url)

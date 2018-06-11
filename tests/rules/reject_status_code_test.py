@@ -65,7 +65,7 @@ class RejectStatusCodeTest(TestCase):
 class TestDetectSoft404(TestCase):
 
     def setUp(self):
-        self.rule = DetectSoft404()
+        self.rule = DetectSoft404(collect_retry_delay=0.0)
         self.engine = FakeEngine()
         self.rule.set_engine(self.engine)
         self.kb = KnowledgeBase()
