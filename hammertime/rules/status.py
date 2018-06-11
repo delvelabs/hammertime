@@ -68,14 +68,16 @@ class DetectSoft404:
         self.child_heuristics = heuristics
 
     async def on_request_successful(self, entry):
-        if entry.response.code == 404:
+        entry.result.soft404 = False
+        if entry.response.code != 404:
             # We want to apply this logic to any URI that provides the same output regardless of the path provided.
             # However this makes no sense when the server tells us it does not exist, so skil this case.
-            entry.result.soft404 = False
-        else:
             entry.result.soft404 = await self.is_soft_404(entry.request.url, entry.response)
 
     async def is_soft_404(self, url, response):
+        if self._is_home(url):
+            return False
+
         # Before fetching a new 404 sample for a specific path, verify if the currently
         # obtained paths do not already have a matching sample. This will avoid multiple
         # requests per sub-path and extension when a catch-all already exists.
@@ -86,11 +88,14 @@ class DetectSoft404:
 
         # Fully perform, fetching as required
         soft_404_response = await self.get_soft_404_sample(url)
+
+        if soft_404_response is None:
+            raise RejectRequest("Impossible to obtain required sample. Cannot confirm result validity.")
         return self._match(response, soft_404_response)
 
     async def get_soft_404_sample(self, url, *, fetch_missing=True):
         server_address = urljoin(url, "/")
-        if url == server_address:  # skip home page.
+        if self._is_home(url):
             return None
 
         # If we have a match, leave right away
@@ -116,6 +121,10 @@ class DetectSoft404:
         elif self.performed[server_address][request_url_pattern] is not None:
             await self.performed[server_address][request_url_pattern]
         return self.soft_404_responses[server_address][request_url_pattern]
+
+    def _is_home(self, url):
+        server_address = urljoin(url, "/")
+        return url == server_address
 
     async def _collect_sample(self, url, url_pattern):
         """

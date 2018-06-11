@@ -107,7 +107,8 @@ class TestDetectSoft404(TestCase):
     async def test_remove_lock_if_stop_request_raised(self):
         self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
 
-        await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
+        with self.assertRaises(RejectRequest):
+            await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
 
         self.assertEqual(self.rule.performed["http://example.com/"]["/\l"], None)
 
@@ -138,7 +139,9 @@ class TestDetectSoft404(TestCase):
     async def test_add_None_to_knowledge_base_if_request_failed(self):
         self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
 
-        await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
+        with self.assertRaises(RejectRequest):
+            await self.rule.on_request_successful(self.create_entry("http://example.com/test",
+                                                                    response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {"/\l": None})
 
@@ -190,7 +193,8 @@ class TestDetectSoft404(TestCase):
         self.rule.performed["http://example.com/"] = {"/\l": None}
         entry = self.create_entry("http://example.com/test", response_content="test")
 
-        await self.rule.on_request_successful(entry)
+        with self.assertRaises(RejectRequest):
+            await self.rule.on_request_successful(entry)
 
         self.assertFalse(entry.result.soft404)
 
