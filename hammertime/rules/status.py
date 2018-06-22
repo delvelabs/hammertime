@@ -32,14 +32,15 @@ from .simhash import Simhash, DEFAULT_FILTER
 
 class RejectStatusCode:
 
-    def __init__(self, *args):
+    def __init__(self, *args, exception_class=RejectRequest):
+        self.exception_class = exception_class
         self.reject_set = set()
         for r in args:
             self.reject_set |= set(r)
 
     async def after_headers(self, entry):
         if entry.response.code in self.reject_set:
-            raise RejectRequest("Status code reject: %s" % entry.response.code)
+            raise self.exception_class("Status code reject: %s" % entry.response.code)
 
 
 class DetectSoft404:
@@ -83,7 +84,7 @@ class DetectSoft404:
         # requests per sub-path and extension when a catch-all already exists.
         for potential_target in self.enumerate_candidates(url):
             candidate = await self.get_soft_404_sample(potential_target, fetch_missing=False)
-            if self.signature_comparator.match(response, candidate):
+            if self.signature_comparator.match(response, candidate, url=url):
                 return True
 
         # Fully perform, fetching as required
@@ -91,7 +92,7 @@ class DetectSoft404:
 
         if soft_404_response is None:
             raise RejectRequest("Impossible to obtain required sample. Cannot confirm result validity.")
-        return self.signature_comparator.match(response, soft_404_response)
+        return self.signature_comparator.match(response, soft_404_response, url=url)
 
     async def get_soft_404_sample(self, url, *, fetch_missing=True):
         server_address = urljoin(url, "/")
@@ -140,7 +141,7 @@ class DetectSoft404:
                 request = Entry.create(url, arguments={"timeout": 10})
                 result = await self.engine.perform_high_priority(request, self.child_heuristics)
 
-                return self.signature_comparator.from_response(result.response)
+                return self.signature_comparator.from_entry(result)
             except StopRequest:
                 await asyncio.sleep(self.collect_retry_delay)
 
@@ -245,11 +246,12 @@ class SignatureComparator:
         self.token_size = token_size
         self.sample_length = sample_length
 
-    def from_response(self, response):
+    def from_entry(self, entry):
+        response = entry.response
         return ContentSignature(code=response.code,
                                 content_simhash=self._simhash(response),
                                 content_hash=self._hash(response),
-                                content_sample=self._sample(response))
+                                content_sample=self._sample(response.raw, entry.request.url))
 
     def _hash(self, response):
         return hashlib.md5(response.raw).digest()
@@ -260,16 +262,16 @@ class SignatureComparator:
         except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
             return None
 
-    def _sample(self, response):
-        return response.raw[0:self.sample_length]
+    def _sample(self, response, request_url):
+        return response[0:self.sample_length]
 
-    def match(self, response, signature):
+    def match(self, response, signature, *, url):
         if signature is None:
             return False
 
         current = ContentSignature(code=response.code)
 
-        if current.code == response.code:
+        if current.code == signature.code:
             current.content_hash = self._hash(response)
             if signature.content_hash is not None and signature.content_hash == current.content_hash:
                 return True
@@ -279,7 +281,7 @@ class SignatureComparator:
                 return True
 
             if self.sample_length > 0:
-                current.content_sample = self._sample(response)
+                current.content_sample = self._sample(response.raw, url)
                 if signature.match_sample(current):
                     return True
 

@@ -24,7 +24,7 @@ import hashlib
 from aiohttp.test_utils import make_mocked_coro
 
 from fixtures import async_test
-from hammertime.rules.status import ContentSignature
+from hammertime.rules.status import ContentSignature, SignatureComparator
 from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest, StopRequest
@@ -221,7 +221,8 @@ class TestDetectSoft404(TestCase):
         response.set_content(raw, True)
 
         self.assertFalse(self.rule.signature_comparator.match(response,
-                                                              ContentSignature(code=200, content_simhash=12345)))
+                                                              ContentSignature(code=200, content_simhash=12345),
+                                                              url="http://example.com/"))
 
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
@@ -317,6 +318,18 @@ class TestDetectSoft404(TestCase):
         entry = self.engine.mock.perform_high_priority.call_args[0][0]
         self.assertEqual(entry.request.url, url)
         self.engine.mock.reset_mock()
+
+
+class SignatureComparatorTest(TestCase):
+
+    def test_sampling_removes_origin_information(self):
+        sample_a = '<iframe sandbox="allow-same-origin allow-scripts allow-top-navigation" id="preferredMethod" src="https://www.example.com:2096/unprotected/loader.html?random=Hh2c1OlZNtIkWS8F&amp;goto_uri=%2ffiles.inc" style="display:none;"></iframe>' * 10 # noqa
+        sample_b = '<iframe sandbox="allow-same-origin allow-scripts allow-top-navigation" id="preferredMethod" src="https://www.example.com:2096/unprotected/loader.html?random=nsfufafuidafKNUF&amp;goto_uri=%2fabc12345678901234567890.inc" style="display:none;"></iframe>' * 10 # noqa
+
+        comparator = SignatureComparator()
+        sig_a = ContentSignature(code=200, content_sample=comparator._sample(sample_a, "http://example.com/files.inc"))
+        sig_b = ContentSignature(code=200, content_sample=comparator._sample(sample_b, "http://example.com/abc123.inc"))
+        self.assertTrue(sig_a.match_sample(sig_b))
 
 
 class FakeEngine(Engine):
