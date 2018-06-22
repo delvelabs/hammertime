@@ -24,6 +24,7 @@ import hashlib
 from aiohttp.test_utils import make_mocked_coro
 
 from fixtures import async_test
+from hammertime.rules.status import ContentSignature
 from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest, StopRequest
@@ -128,12 +129,12 @@ class TestDetectSoft404(TestCase):
                                                                 response_content="response"))
 
         simhash = Simhash(response.content).value
-        raw = self.rule._hash(response)
+        raw = self.rule.signature_comparator._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-            "/\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY},
-            "/\d/": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY},
-            "/.\l": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY},
-            "/123/\l.js": {"code": 200, "content_simhash": simhash, "raw_content_hash": raw, "content_sample": ANY}})
+            "/\l": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY),
+            "/\d/": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY),
+            "/.\l": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY),
+            "/123/\l.js": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):
@@ -155,13 +156,14 @@ class TestDetectSoft404(TestCase):
         await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-                "/\l": {"code": 200, "raw_content_hash": hashlib.md5(bytes).digest(), "content_sample": ANY}})
+                "/\l": ContentSignature(code=200, content_hash=hashlib.md5(bytes).digest(), content_sample=ANY)})
 
     @async_test()
     async def test_mark_request_has_soft404_if_pattern_and_response_match_request_in_knowledge_base(self):
         for pattern in ["/test/\d.html", "/\d-\l.js", "/\L/", "/\i", "/abc/.\l.js"]:
             simhash = Simhash("response content").value
-            self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
+            self.kb.soft_404_responses["http://example.com/"][pattern] = ContentSignature(code=200,
+                                                                                          content_simhash=simhash)
             self.rule.performed["http://example.com/"][pattern] = None
 
         urls = [urljoin("http://example.com/", path) for path in ["/test/123.html", "/123-test.js", "/TEST/", "/TesT",
@@ -176,7 +178,8 @@ class TestDetectSoft404(TestCase):
     async def test_dont_mark_as_soft404_if_no_match_in_knowledge_base(self):
         simhash = Simhash("response content").value
         for pattern in ["/\l.html", "/\l", "/.\l", "/\l.php"]:
-            self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
+            self.kb.soft_404_responses["http://example.com/"][pattern] = ContentSignature(code=200,
+                                                                                          content_simhash=simhash)
             self.rule.performed["http://example.com/"][pattern] = None
         entries = [self.create_entry("http://example.com/test.html", response_content="test"),
                    self.create_entry("http://example.com/test", response_content="test"),
@@ -202,7 +205,7 @@ class TestDetectSoft404(TestCase):
     async def test_compare_hash_of_raw_content_if_raw_content_hash_in_knowledge_base(self):
         raw = b'Invalid UTF8 x\x80Z"'
         _hash = hashlib.md5(raw).digest()
-        self.kb.soft_404_responses["http://example.com/"]["/\l"] = {"code": 200, "raw_content_hash": _hash}
+        self.kb.soft_404_responses["http://example.com/"]["/\l"] = ContentSignature(code=200, content_hash=_hash)
         self.rule.performed["http://example.com/"] = {"/\l": None}
         response = Response(200, {})
         response.set_content(raw, True)
@@ -217,7 +220,8 @@ class TestDetectSoft404(TestCase):
         response = Response(200, {})
         response.set_content(raw, True)
 
-        self.assertFalse(self.rule._match(response, {"code": 200, "content_simhash": 12345}))
+        self.assertFalse(self.rule.signature_comparator.match(response,
+                                                              ContentSignature(code=200, content_simhash=12345)))
 
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):

@@ -49,11 +49,11 @@ class DetectSoft404:
         self.engine = None
         self.performed = defaultdict(dict)
         self.soft_404_responses = defaultdict(dict)
-        self.distance_threshold = distance_threshold
-        self.match_filter = match_filter
-        self.token_size = token_size
-        self.sample_length = sample_length
         self.collect_retry_delay = collect_retry_delay
+        self.signature_comparator = SignatureComparator(distance_threshold=distance_threshold,
+                                                        match_filter=match_filter,
+                                                        token_size=token_size,
+                                                        sample_length=sample_length)
 
     def set_engine(self, engine):
         self.engine = engine
@@ -83,7 +83,7 @@ class DetectSoft404:
         # requests per sub-path and extension when a catch-all already exists.
         for potential_target in self.enumerate_candidates(url):
             candidate = await self.get_soft_404_sample(potential_target, fetch_missing=False)
-            if self._match(response, candidate):
+            if self.signature_comparator.match(response, candidate):
                 return True
 
         # Fully perform, fetching as required
@@ -91,7 +91,7 @@ class DetectSoft404:
 
         if soft_404_response is None:
             raise RejectRequest("Impossible to obtain required sample. Cannot confirm result validity.")
-        return self._match(response, soft_404_response)
+        return self.signature_comparator.match(response, soft_404_response)
 
     async def get_soft_404_sample(self, url, *, fetch_missing=True):
         server_address = urljoin(url, "/")
@@ -140,16 +140,7 @@ class DetectSoft404:
                 request = Entry.create(url, arguments={"timeout": 10})
                 result = await self.engine.perform_high_priority(request, self.child_heuristics)
 
-                try:
-                    simhash = self._simhash(result.response)
-                    return {"code": result.response.code,
-                            "content_simhash": simhash,
-                            "raw_content_hash": self._hash(result.response),
-                            "content_sample": self._sample(result.response)}
-                except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
-                    return {"code": result.response.code,
-                            "raw_content_hash": self._hash(result.response),
-                            "content_sample": self._sample(result.response)}
+                return self.signature_comparator.from_response(result.response)
             except StopRequest:
                 await asyncio.sleep(self.collect_retry_delay)
 
@@ -162,43 +153,6 @@ class DetectSoft404:
             yield urljoin(url, path)
             yield urljoin(url, path) + "/"
             path, _ = os.path.split(path)
-
-    def _match(self, response, soft_404_response):
-        if soft_404_response is None:
-            return False
-
-        if soft_404_response["code"] == response.code:
-            if "raw_content_hash" in soft_404_response:
-                if self._hash(response) == soft_404_response["raw_content_hash"]:
-                    return True
-
-            if "content_simhash" in soft_404_response:
-                try:
-                    resp_hash = Simhash(self._simhash(response))
-                    distance = resp_hash.distance(Simhash(soft_404_response["content_simhash"]))
-                    if distance < self.distance_threshold:
-                        return True
-                except UnicodeDecodeError:  # response content is not text, cannot match text.
-                    pass
-
-            if self.sample_length and "content_sample" in soft_404_response:
-                sample = self._sample(response)
-                matcher = SequenceMatcher(isjunk=None, a=soft_404_response["content_sample"], b=sample, autojunk=False)
-
-                # This content is almost similar to a generated 404, therefore it's a 404.
-                if matcher.ratio() > 0.8:
-                    return True
-
-        return False
-
-    def _hash(self, response):
-        return hashlib.md5(response.raw).digest()
-
-    def _simhash(self, response):
-        return Simhash(response.content, filter=self.match_filter, token_size=self.token_size).value
-
-    def _sample(self, response):
-        return response.raw[0:self.sample_length]
 
     def _extract_pattern_from_url(self, url):
         """Return the path part of the URL with the last element replaced with its pattern in a regex-like format:
@@ -281,3 +235,82 @@ class RejectSoft404:
     async def on_request_successful(self, entry):
         if entry.result.soft404:
             raise RejectRequest("Response to %s is a soft 404." % entry.request)
+
+
+class SignatureComparator:
+
+    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4, sample_length=5120):
+        self.distance_threshold = distance_threshold
+        self.match_filter = match_filter
+        self.token_size = token_size
+        self.sample_length = sample_length
+
+    def from_response(self, response):
+        return ContentSignature(code=response.code,
+                                content_simhash=self._simhash(response),
+                                content_hash=self._hash(response),
+                                content_sample=self._sample(response))
+
+    def _hash(self, response):
+        return hashlib.md5(response.raw).digest()
+
+    def _simhash(self, response):
+        try:
+            return Simhash(response.content, filter=self.match_filter, token_size=self.token_size).value
+        except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
+            return None
+
+    def _sample(self, response):
+        return response.raw[0:self.sample_length]
+
+    def match(self, response, signature):
+        if signature is None:
+            return False
+
+        current = ContentSignature(code=response.code)
+
+        if current.code == response.code:
+            current.content_hash = self._hash(response)
+            if signature.content_hash is not None and signature.content_hash == current.content_hash:
+                return True
+
+            current.content_simhash = self._simhash(response)
+            if signature.match_simhash(current, self.distance_threshold):
+                return True
+
+            if self.sample_length > 0:
+                current.content_sample = self._sample(response)
+                if signature.match_sample(current):
+                    return True
+
+        return False
+
+
+class ContentSignature:
+
+    def __init__(self, *, code, content_hash=None, content_sample=None, content_simhash=None):
+        self.code = code
+        self.content_hash = content_hash
+        self.content_sample = content_sample
+        self.content_simhash = content_simhash
+
+    def match_sample(self, other):
+        if self.content_sample is None or other.content_sample is None:
+            return False
+
+        matcher = SequenceMatcher(a=self.content_sample, b=other.content_sample,
+                                  isjunk=None, autojunk=False)
+
+        # This content is almost similar to a generated 404, therefore it's a 404.
+        return matcher.ratio() > 0.8
+
+    def match_simhash(self, other, distance_threshold):
+        if self.content_simhash is None or other.content_simhash is None:
+            return False
+
+        resp_hash = Simhash(other.content_simhash)
+        distance = resp_hash.distance(Simhash(self.content_simhash))
+        return distance < distance_threshold
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
