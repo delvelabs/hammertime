@@ -131,10 +131,10 @@ class TestDetectSoft404(TestCase):
         simhash = Simhash(response.content).value
         raw = self.rule.signature_comparator._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-            "/\l": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY),
-            "/\d/": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY),
-            "/.\l": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY),
-            "/123/\l.js": ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)})
+            "/\l": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
+            "/\d/": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
+            "/.\l": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
+            "/123/\l.js": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)]})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):
@@ -156,7 +156,21 @@ class TestDetectSoft404(TestCase):
         await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-                "/\l": ContentSignature(code=200, content_hash=hashlib.md5(bytes).digest(), content_sample=ANY)})
+                "/\l": [ContentSignature(code=200, content_hash=hashlib.md5(bytes).digest(), content_sample=ANY)]})
+
+    @async_test()
+    async def test_mutliple_values_for_sample_url(self):
+        a = Response(404, {})
+        a.set_content(b"a", True)
+        b = Response(200, {})
+        b.set_content(b"response", True)
+        self.engine.response = [a, b]
+
+        entry = self.create_entry("http://example.com/test", response_content="response")
+        self.rule.confirmation_factor = 5
+        await self.rule.on_request_successful(entry)
+
+        self.assertTrue(entry.result.soft404)
 
     @async_test()
     async def test_mark_request_has_soft404_if_pattern_and_response_match_request_in_knowledge_base(self):
@@ -342,6 +356,12 @@ class FakeEngine(Engine):
         return self.mock.perform(entry, heuristics)
 
     async def perform_high_priority(self, entry, heuristics):
-        entry.response = self.response or StaticResponse(200, {}, content="content")
+        response = self.response
+        if isinstance(response, list):
+            # Pick first and rotate
+            response = self.response[0]
+            self.response = self.response[1:] + [response]
+
+        entry.response = response or StaticResponse(200, {}, content="content")
         self.mock.perform_high_priority(entry, heuristics)
         return entry

@@ -46,9 +46,10 @@ class RejectStatusCode:
 class DetectSoft404:
 
     def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4, sample_length=5120,
-                 collect_retry_delay=5.0):
+                 collect_retry_delay=5.0, confirmation_factor=1):
         self.engine = None
         self.performed = defaultdict(dict)
+        self.confirmation_factor = confirmation_factor
         self.soft_404_responses = defaultdict(dict)
         self.collect_retry_delay = collect_retry_delay
         self.signature_comparator = SignatureComparator(distance_threshold=distance_threshold,
@@ -84,7 +85,7 @@ class DetectSoft404:
         # requests per sub-path and extension when a catch-all already exists.
         for potential_target in self.enumerate_candidates(url):
             candidate = await self.get_soft_404_sample(potential_target, fetch_missing=False)
-            if self.signature_comparator.match(response, candidate, url=url):
+            if self.signature_comparator.match_list(response, candidate, url=url):
                 return True
 
         # Fully perform, fetching as required
@@ -92,7 +93,10 @@ class DetectSoft404:
 
         if soft_404_response is None:
             raise RejectRequest("Impossible to obtain required sample. Cannot confirm result validity.")
-        return self.signature_comparator.match(response, soft_404_response, url=url)
+
+        is_soft_404 = self.signature_comparator.match_list(response, soft_404_response, url=url)
+
+        return is_soft_404
 
     async def get_soft_404_sample(self, url, *, fetch_missing=True):
         server_address = urljoin(url, "/")
@@ -135,17 +139,35 @@ class DetectSoft404:
         - Multiple retries with longer delays
         - Larger than usual timeout
         """
-        url = self._create_random_url(url, url_pattern)
+        samples = []
+
+        urls = [self._create_random_url(url, url_pattern) for _ in range(self.confirmation_factor)]
+        iterator = asyncio.as_completed([self._fetch_sample(url) for url in urls])
+        for promise in iterator:
+            try:
+                sig = await promise
+                if sig:
+                    samples.append(sig)
+            except RejectRequest:
+                pass
+
+        if not samples:
+            raise StopRequest("Impossible to obtain sample")
+        else:
+            return samples
+
+    async def _fetch_sample(self, url):
         for x in range(5):
             try:
                 request = Entry.create(url, arguments={"timeout": 10})
                 result = await self.engine.perform_high_priority(request, self.child_heuristics)
 
-                return self.signature_comparator.from_entry(result)
+                sig = self.signature_comparator.from_entry(result)
+                return sig
             except StopRequest:
                 await asyncio.sleep(self.collect_retry_delay)
 
-        raise StopRequest("Impossible to obtain sample")
+        return None
 
     def enumerate_candidates(self, url):
         parts = urlparse(url)
@@ -284,6 +306,18 @@ class SignatureComparator:
                 current.content_sample = self._sample(response.raw, url)
                 if signature.match_sample(current):
                     return True
+
+        return False
+
+    def match_list(self, response, signature_list, *, url):
+        if signature_list is None:
+            return False
+
+        signature_list = signature_list if isinstance(signature_list, list) else [signature_list]
+
+        for signature in signature_list:
+            if self.match(response, signature, url=url):
+                return True
 
         return False
 
