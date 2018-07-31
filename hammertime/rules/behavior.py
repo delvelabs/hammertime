@@ -24,7 +24,8 @@ class DetectBehaviorChange:
     def __init__(self, buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, token_size=4,
                  safe_status_codes=None):
         self.safe_status_codes = safe_status_codes or {401, 403, 404}
-        self.previous_responses = []
+        self.behavior_buffer = []
+        self.known_bad_behavior = set()
         self.max_buffer_size = buffer_size
         self.error_behavior = False
         self.match_threshold = match_threshold
@@ -32,10 +33,10 @@ class DetectBehaviorChange:
         self.token_size = token_size
 
     def set_kb(self, kb):
-        kb.behavior_buffer = self.previous_responses
+        kb.bad_behavior_response = self.known_bad_behavior
 
     def load_kb(self, kb):
-        self.previous_responses = kb.behavior_buffer
+        self.known_bad_behavior = kb.bad_behavior_response
 
     async def after_response(self, entry):
         if entry.response.code in self.safe_status_codes:
@@ -44,10 +45,21 @@ class DetectBehaviorChange:
 
         resp_content = self._read_content(entry.response)
         content_simhash = self._hash(resp_content)
-        if len(self.previous_responses) >= self.max_buffer_size:
+        entry.result.error_simhash = content_simhash.value
+
+        if any(content_simhash.distance(Simhash(known)) < self.match_threshold for known in self.known_bad_behavior):
+            entry.result.error_behavior = True
+            return
+
+        if len(self.behavior_buffer) >= self.max_buffer_size:
             self.error_behavior = self._is_error_behavior(content_simhash)
-            self.previous_responses.pop(0)
-        self.previous_responses.append(content_simhash.value)
+            self.behavior_buffer.pop(0)
+
+        if self.error_behavior:
+            for x in self.behavior_buffer:
+                self.known_bad_behavior.add(x)
+
+        self.behavior_buffer.append(content_simhash.value)
         entry.result.error_behavior = self.error_behavior
 
     def _is_error_behavior(self, content_simhash):
@@ -60,17 +72,20 @@ class DetectBehaviorChange:
         return response.raw.decode('utf-8', errors='ignore')
 
     def _responses_match(self, resp_simhash):
-        for simhash_value in self.previous_responses:
+        for simhash_value in self.behavior_buffer:
             simhash = Simhash(simhash_value)
             yield resp_simhash.distance(simhash) < self.match_threshold
 
 
+class BehaviorError(RejectRequest):
+    pass
+
+
 class RejectErrorBehavior:
+
+    def __init__(self, error_class=BehaviorError):
+        self.error_class = error_class
 
     async def after_response(self, entry):
         if entry.result.error_behavior:
-            raise BehaviorError()
-
-
-class BehaviorError(RejectRequest):
-    pass
+            raise self.error_class("Error behavior detected")

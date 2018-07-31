@@ -38,19 +38,19 @@ class TestDetectBehaviorChange(TestCase):
     async def test_after_response_store_simhash_of_response_content_in_knowledge_base(self):
         await self.behavior_detection.after_response(self.entry)
 
-        self.assertEqual(self.kb.behavior_buffer, [Simhash(self.entry.response.content).value])
+        self.assertEqual(self.behavior_detection.behavior_buffer, [Simhash(self.entry.response.content).value])
 
     @async_test()
     async def test_after_response_pop_first_result_when_buffer_is_full(self):
-        self.kb.behavior_buffer.extend([i for i in range(10)])
+        self.behavior_detection.behavior_buffer.extend([i for i in range(10)])
 
         await self.behavior_detection.after_response(self.entry)
 
-        self.assertEqual(self.kb.behavior_buffer, [1, 2, 3, 4, 5, 6, 7, 8, 9, Simhash("data").value])
+        self.assertEqual(self.behavior_detection.behavior_buffer, [1, 2, 3, 4, 5, 6, 7, 8, 9, Simhash("data").value])
 
     @async_test()
     async def test_after_response_test_behavior_if_behavior_buffer_is_full(self):
-        self.kb.behavior_buffer.extend(["data"] * 10)
+        self.behavior_detection.behavior_buffer.extend(["data"] * 10)
         self.behavior_detection._is_error_behavior = MagicMock(return_value=False)
         simhash = Simhash("value")
         self.behavior_detection._hash = MagicMock(return_value=simhash)
@@ -61,7 +61,7 @@ class TestDetectBehaviorChange(TestCase):
 
     @async_test()
     async def test_after_response_dont_test_behavior_if_behavior_buffer_not_full(self):
-        self.kb.behavior_buffer.extend(["data"] * 5)
+        self.behavior_detection.behavior_buffer.extend(["data"] * 5)
         self.behavior_detection._is_error_behavior = MagicMock(return_value=False)
 
         await self.behavior_detection.after_response(self.entry)
@@ -69,8 +69,26 @@ class TestDetectBehaviorChange(TestCase):
         self.behavior_detection._is_error_behavior.assert_not_called()
 
     @async_test()
+    async def test_after_response_permanently_flag_bad_behavior_even_if_normal_status_occurs(self):
+        self.behavior_detection.behavior_buffer.extend(["data"] * 10)
+
+        await self.behavior_detection.after_response(self.entry)
+        self.assertTrue(self.entry.result.error_behavior, "State should have been recorded")
+
+        self.entry.response.content = "good response"
+        await self.behavior_detection.after_response(self.entry)
+
+        self.behavior_detection._is_error_behavior = MagicMock(return_value=False)
+
+        self.entry.response.content = "data"
+        await self.behavior_detection.after_response(self.entry)
+
+        self.behavior_detection._is_error_behavior.assert_not_called()
+        self.assertTrue(self.entry.result.error_behavior)
+
+    @async_test()
     async def test_after_response_set_flag_in_entry_result_if_behavior_is_not_normal(self):
-        self.kb.behavior_buffer.extend(["data"] * 10)
+        self.behavior_detection.behavior_buffer.extend(["data"] * 10)
 
         await self.behavior_detection.after_response(self.entry)
 
@@ -80,7 +98,7 @@ class TestDetectBehaviorChange(TestCase):
     @async_test()
     async def test_safe_code_does_not_trigger_error(self):
         self.entry.response.code = 404
-        self.kb.behavior_buffer.extend(["data"] * 10)
+        self.behavior_detection.behavior_buffer.extend(["data"] * 10)
 
         await self.behavior_detection.after_response(self.entry)
 
@@ -89,7 +107,7 @@ class TestDetectBehaviorChange(TestCase):
 
     @async_test()
     async def test_after_response_dont_set_flag_in_entry_result_if_normal_behavior_restored(self):
-        self.kb.behavior_buffer.extend(["test"] * 10)
+        self.behavior_detection.behavior_buffer.extend(["test"] * 10)
         self.behavior_detection.error_behavior = True
 
         await self.behavior_detection.after_response(self.entry)
