@@ -38,7 +38,7 @@ class DetectBehaviorChange:
     def load_kb(self, kb):
         self.known_bad_behavior = kb.bad_behavior_response
 
-    async def after_response(self, entry):
+    async def on_request_successful(self, entry):
         if entry.response.code in self.safe_status_codes:
             entry.result.error_behavior = False
             return
@@ -86,6 +86,6 @@ class RejectErrorBehavior:
     def __init__(self, error_class=BehaviorError):
         self.error_class = error_class
 
-    async def after_response(self, entry):
+    async def on_request_successful(self, entry):
         if entry.result.error_behavior:
             raise self.error_class("Error behavior detected")
