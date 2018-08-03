@@ -23,11 +23,9 @@ from difflib import SequenceMatcher
 import re
 import random
 import string
-import hashlib
 
 from ..ruleset import RejectRequest, StopRequest
 from ..http import Entry
-from .simhash import Simhash, DEFAULT_FILTER
 
 
 class RejectStatusCode:
@@ -45,7 +43,7 @@ class RejectStatusCode:
 
 class DetectSoft404:
 
-    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4, sample_length=5120,
+    def __init__(self, distance_threshold=5, sample_length=5120,
                  collect_retry_delay=5.0, confirmation_factor=1):
         self.engine = None
         self.performed = defaultdict(dict)
@@ -53,8 +51,6 @@ class DetectSoft404:
         self.soft_404_responses = defaultdict(dict)
         self.collect_retry_delay = collect_retry_delay
         self.signature_comparator = SignatureComparator(distance_threshold=distance_threshold,
-                                                        match_filter=match_filter,
-                                                        token_size=token_size,
                                                         sample_length=sample_length)
 
     def set_engine(self, engine):
@@ -79,8 +75,6 @@ class DetectSoft404:
     async def is_soft_404(self, url, entry):
         if self._is_home(url):
             return False
-
-        response = entry.response
 
         # Before fetching a new 404 sample for a specific path, verify if the currently
         # obtained paths do not already have a matching sample. This will avoid multiple
@@ -264,24 +258,16 @@ class RejectSoft404:
 
 class SignatureComparator:
 
-    def __init__(self, distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4, sample_length=5120):
+    def __init__(self, distance_threshold=5, sample_length=5120):
         self.distance_threshold = distance_threshold
-        self.match_filter = match_filter
-        self.token_size = token_size
         self.sample_length = sample_length
 
     def from_entry(self, entry):
         response = entry.response
         return ContentSignature(code=response.code,
-                                content_simhash=self._simhash(response),
+                                content_simhash=entry.result.content_simhash,
                                 content_hash=entry.result.content_hash,
                                 content_sample=self._sample(response.raw, entry.request.url))
-
-    def _simhash(self, response):
-        try:
-            return Simhash(response.content, filter=self.match_filter, token_size=self.token_size).value
-        except UnicodeDecodeError:  # Response content is not text, store the hash of the raw data:
-            return None
 
     def _sample(self, response, request_url):
         return response[0:self.sample_length]
@@ -298,7 +284,7 @@ class SignatureComparator:
             if signature.content_hash is not None and signature.content_hash == current.content_hash:
                 return True
 
-            current.content_simhash = self._simhash(response)
+            current.content_simhash = entry.result.content_simhash
             if signature.match_simhash(current, self.distance_threshold):
                 return True
 
@@ -344,8 +330,8 @@ class ContentSignature:
         if self.content_simhash is None or other.content_simhash is None:
             return False
 
-        resp_hash = Simhash(other.content_simhash)
-        distance = resp_hash.distance(Simhash(self.content_simhash))
+        resp_hash = other.content_simhash
+        distance = resp_hash.distance(self.content_simhash)
         return distance < distance_threshold
 
     def __eq__(self, other):

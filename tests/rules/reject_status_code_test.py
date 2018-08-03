@@ -24,7 +24,7 @@ import hashlib
 from aiohttp.test_utils import make_mocked_coro
 
 from fixtures import async_test, Pipeline
-from hammertime.rules.sampling import ContentHashSampling
+from hammertime.rules.sampling import ContentHashSampling, ContentSimhashSampling
 from hammertime.rules.status import ContentSignature, SignatureComparator
 from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
@@ -70,7 +70,9 @@ class TestDetectSoft404(TestCase):
         self.engine = FakeEngine()
         self.runner = Pipeline(engine=self.engine)
         self.runner.add(ContentHashSampling())
+        self.runner.add(ContentSimhashSampling())
         self.runner.add_child(ContentHashSampling())
+        self.runner.add_child(ContentSimhashSampling())
         self.runner.add(self.rule)
         self.kb = self.runner.kb
         self.rule.child_heuristics = self.runner.child_heuristics
@@ -130,13 +132,12 @@ class TestDetectSoft404(TestCase):
         await self.runner.perform_ok(self.create_entry("http://example.com/123/test.js",
                                                        response_content="response"))
 
-        simhash = Simhash(response.content).value
         raw = ContentHashSampling()._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-            "/\l": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
-            "/\d/": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
-            "/.\l": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
-            "/123/\l.js": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)]})
+            "/\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
+            "/\d/": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
+            "/.\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
+            "/123/\l.js": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)]})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):
@@ -177,7 +178,7 @@ class TestDetectSoft404(TestCase):
     @async_test()
     async def test_mark_request_has_soft404_if_pattern_and_response_match_request_in_knowledge_base(self):
         for pattern in ["/test/\d.html", "/\d-\l.js", "/\L/", "/\i", "/abc/.\l.js"]:
-            simhash = Simhash("response content").value
+            simhash = Simhash("response content")
             self.kb.soft_404_responses["http://example.com/"][pattern] = ContentSignature(code=200,
                                                                                           content_simhash=simhash)
             self.rule.performed["http://example.com/"][pattern] = None
@@ -192,7 +193,7 @@ class TestDetectSoft404(TestCase):
 
     @async_test()
     async def test_dont_mark_as_soft404_if_no_match_in_knowledge_base(self):
-        simhash = Simhash("response content").value
+        simhash = Simhash("response content")
         for pattern in ["/\l.html", "/\l", "/.\l", "/\l.php"]:
             self.kb.soft_404_responses["http://example.com/"][pattern] = ContentSignature(code=200,
                                                                                           content_simhash=simhash)
@@ -233,7 +234,7 @@ class TestDetectSoft404(TestCase):
 
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
-        simhash = Simhash("response content").value
+        simhash = Simhash("response content")
         for pattern in ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]:
             self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
             self.rule.performed["http://example.com/"] = {pattern: None}
