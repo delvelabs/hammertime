@@ -74,18 +74,20 @@ class DetectSoft404:
         if entry.response.code != 404:
             # We want to apply this logic to any URI that provides the same output regardless of the path provided.
             # However this makes no sense when the server tells us it does not exist, so skil this case.
-            entry.result.soft404 = await self.is_soft_404(entry.request.url, entry.response)
+            entry.result.soft404 = await self.is_soft_404(entry.request.url, entry)
 
-    async def is_soft_404(self, url, response):
+    async def is_soft_404(self, url, entry):
         if self._is_home(url):
             return False
+
+        response = entry.response
 
         # Before fetching a new 404 sample for a specific path, verify if the currently
         # obtained paths do not already have a matching sample. This will avoid multiple
         # requests per sub-path and extension when a catch-all already exists.
         for potential_target in self.enumerate_candidates(url):
             candidate = await self.get_soft_404_sample(potential_target, fetch_missing=False)
-            if self.signature_comparator.match_list(response, candidate, url=url):
+            if self.signature_comparator.match_list(entry, candidate, url=url):
                 return True
 
         # Fully perform, fetching as required
@@ -94,7 +96,7 @@ class DetectSoft404:
         if soft_404_response is None:
             raise RejectRequest("Impossible to obtain required sample. Cannot confirm result validity.")
 
-        is_soft_404 = self.signature_comparator.match_list(response, soft_404_response, url=url)
+        is_soft_404 = self.signature_comparator.match_list(entry, soft_404_response, url=url)
 
         return is_soft_404
 
@@ -272,11 +274,8 @@ class SignatureComparator:
         response = entry.response
         return ContentSignature(code=response.code,
                                 content_simhash=self._simhash(response),
-                                content_hash=self._hash(response),
+                                content_hash=entry.result.content_hash,
                                 content_sample=self._sample(response.raw, entry.request.url))
-
-    def _hash(self, response):
-        return hashlib.md5(response.raw).digest()
 
     def _simhash(self, response):
         try:
@@ -287,14 +286,15 @@ class SignatureComparator:
     def _sample(self, response, request_url):
         return response[0:self.sample_length]
 
-    def match(self, response, signature, *, url):
+    def match(self, entry, signature, *, url):
         if signature is None:
             return False
 
+        response = entry.response
         current = ContentSignature(code=response.code)
 
         if current.code == signature.code:
-            current.content_hash = self._hash(response)
+            current.content_hash = entry.result.content_hash
             if signature.content_hash is not None and signature.content_hash == current.content_hash:
                 return True
 
@@ -309,14 +309,14 @@ class SignatureComparator:
 
         return False
 
-    def match_list(self, response, signature_list, *, url):
+    def match_list(self, entry, signature_list, *, url):
         if signature_list is None:
             return False
 
         signature_list = signature_list if isinstance(signature_list, list) else [signature_list]
 
         for signature in signature_list:
-            if self.match(response, signature, url=url):
+            if self.match(entry, signature, url=url):
                 return True
 
         return False

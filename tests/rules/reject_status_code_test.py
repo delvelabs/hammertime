@@ -23,13 +23,13 @@ import uuid
 import hashlib
 from aiohttp.test_utils import make_mocked_coro
 
-from fixtures import async_test
+from fixtures import async_test, Pipeline
+from hammertime.rules.sampling import ContentHashSampling
 from hammertime.rules.status import ContentSignature, SignatureComparator
 from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest, StopRequest
 from hammertime.engine import Engine
-from hammertime.kb import KnowledgeBase
 from hammertime.rules.simhash import Simhash
 from hammertime.engine.aiohttp import Response
 
@@ -68,10 +68,12 @@ class TestDetectSoft404(TestCase):
     def setUp(self):
         self.rule = DetectSoft404(collect_retry_delay=0.0)
         self.engine = FakeEngine()
-        self.rule.set_engine(self.engine)
-        self.kb = KnowledgeBase()
-        self.rule.set_kb(self.kb)
-        self.rule.child_heuristics = MagicMock()
+        self.runner = Pipeline(engine=self.engine)
+        self.runner.add(ContentHashSampling())
+        self.runner.add_child(ContentHashSampling())
+        self.runner.add(self.rule)
+        self.kb = self.runner.kb
+        self.rule.child_heuristics = self.runner.child_heuristics
         self.host = "http://example.com"
 
     @async_test()
@@ -89,18 +91,18 @@ class TestDetectSoft404(TestCase):
                 patch("hammertime.rules.status.random.randint", MagicMock(return_value=1)):
 
             for url, alternate_url in zip(urls, alternate_urls):
-                await self.rule.on_request_successful(self.create_entry(self.host + url))
+                await self.runner.perform_ok(self.create_entry(self.host + url))
                 self.assertRequested(self.host + alternate_url)
 
     @async_test()
     async def test_calls_not_made_second_time_around(self):
         entry = self.create_entry("http://example.com/test", response_content="response")
         self.engine.mock.perform_high_priority.return_value = entry
-        await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
+        await self.runner.perform_ok(self.create_entry("http://example.com/test"))
 
         self.engine.mock.reset_mock()
 
-        await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
+        await self.runner.perform_ok(self.create_entry("http://example.com/test"))
 
         self.engine.mock.perform_high_priority.assert_not_called()
 
@@ -109,7 +111,7 @@ class TestDetectSoft404(TestCase):
         self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
 
         with self.assertRaises(RejectRequest):
-            await self.rule.on_request_successful(self.create_entry("http://example.com/test"))
+            await self.runner.perform_ok(self.create_entry("http://example.com/test"))
 
         self.assertEqual(self.rule.performed["http://example.com/"]["/\l"], None)
 
@@ -119,17 +121,17 @@ class TestDetectSoft404(TestCase):
         response.content = "response content"
         self.engine.response = response
 
-        await self.rule.on_request_successful(self.create_entry("http://example.com/test",
-                                                                response_content="response"))
-        await self.rule.on_request_successful(self.create_entry("http://example.com/123/",
-                                                                response_content="response"))
-        await self.rule.on_request_successful(self.create_entry("http://example.com/.test",
-                                                                response_content="response"))
-        await self.rule.on_request_successful(self.create_entry("http://example.com/123/test.js",
-                                                                response_content="response"))
+        await self.runner.perform_ok(self.create_entry("http://example.com/test",
+                                                       response_content="response"))
+        await self.runner.perform_ok(self.create_entry("http://example.com/123/",
+                                                       response_content="response"))
+        await self.runner.perform_ok(self.create_entry("http://example.com/.test",
+                                                       response_content="response"))
+        await self.runner.perform_ok(self.create_entry("http://example.com/123/test.js",
+                                                       response_content="response"))
 
         simhash = Simhash(response.content).value
-        raw = self.rule.signature_comparator._hash(response)
+        raw = ContentHashSampling()._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
             "/\l": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
             "/\d/": [ContentSignature(code=200, content_simhash=simhash, content_hash=raw, content_sample=ANY)],
@@ -141,8 +143,8 @@ class TestDetectSoft404(TestCase):
         self.engine.mock.perform_high_priority.side_effect = StopRequest("Timeout reached.")
 
         with self.assertRaises(RejectRequest):
-            await self.rule.on_request_successful(self.create_entry("http://example.com/test",
-                                                                    response_content="response"))
+            await self.runner.perform_ok(self.create_entry("http://example.com/test",
+                                                           response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {"/\l": None})
 
@@ -153,7 +155,7 @@ class TestDetectSoft404(TestCase):
         sample_response.set_content(bytes, True)
         self.engine.response = sample_response
 
-        await self.rule.on_request_successful(self.create_entry("http://example.com/test", response_content="response"))
+        await self.runner.perform_ok(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
                 "/\l": [ContentSignature(code=200, content_hash=hashlib.md5(bytes).digest(), content_sample=ANY)]})
@@ -168,7 +170,7 @@ class TestDetectSoft404(TestCase):
 
         entry = self.create_entry("http://example.com/test", response_content="response")
         self.rule.confirmation_factor = 5
-        await self.rule.on_request_successful(entry)
+        await self.runner.perform_ok(entry)
 
         self.assertTrue(entry.result.soft404)
 
@@ -184,7 +186,7 @@ class TestDetectSoft404(TestCase):
                                                                   "/abc/.test.js"]]
         entries = [self.create_entry(url) for url in urls]
         for entry in entries:
-            await self.rule.on_request_successful(entry)
+            await self.runner.perform_ok(entry)
 
         self.assertTrue(all(entry.result.soft404 for entry in entries))
 
@@ -200,7 +202,7 @@ class TestDetectSoft404(TestCase):
                    self.create_entry("http://example.com/.test", response_content="test"),
                    self.create_entry("http://example.com/test.php", response_content="test")]
         for entry in entries:
-            await self.rule.on_request_successful(entry)
+            await self.runner.perform_ok(entry)
 
         self.assertFalse(any(entry.result.soft404 for entry in entries))
 
@@ -211,7 +213,7 @@ class TestDetectSoft404(TestCase):
         entry = self.create_entry("http://example.com/test", response_content="test")
 
         with self.assertRaises(RejectRequest):
-            await self.rule.on_request_successful(entry)
+            await self.runner.perform_ok(entry)
 
         self.assertFalse(entry.result.soft404)
 
@@ -225,18 +227,9 @@ class TestDetectSoft404(TestCase):
         response.set_content(raw, True)
         entry = Entry.create("http://example.com/test", response=response)
 
-        await self.rule.on_request_successful(entry)
+        await self.runner.perform_ok(entry)
 
         self.assertTrue(entry.result.soft404)
-
-    def test_content_that_is_not_text_never_match_content_simhash_of_sample(self):
-        raw = b'Invalid UTF8 x\x80Z"'
-        response = Response(200, {})
-        response.set_content(raw, True)
-
-        self.assertFalse(self.rule.signature_comparator.match(response,
-                                                              ContentSignature(code=200, content_simhash=12345),
-                                                              url="http://example.com/"))
 
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
@@ -246,16 +239,16 @@ class TestDetectSoft404(TestCase):
             self.rule.performed["http://example.com/"] = {pattern: None}
         entry = self.create_entry("http://example.com/", response_content="home page")
 
-        await self.rule.on_request_successful(entry)
+        await self.runner.perform_ok(entry)
 
         self.assertFalse(entry.result.soft404)
 
     @async_test()
     async def test_on_request_successful(self):
-        entry = Entry.create("http://example.com/", response=StaticResponse(404, {}))
+        entry = Entry.create("http://example.com/", response=StaticResponse(404, {}, "Not Found"))
         self.rule.get_soft_404_sample = make_mocked_coro()
 
-        await self.rule.on_request_successful(entry)
+        await self.runner.perform_ok(entry)
 
         self.rule.get_soft_404_sample.assert_not_called()
         self.assertFalse(entry.result.soft404)
@@ -364,4 +357,8 @@ class FakeEngine(Engine):
 
         entry.response = response or StaticResponse(200, {}, content="content")
         self.mock.perform_high_priority(entry, heuristics)
+        await heuristics.before_request(entry)
+        await heuristics.after_headers(entry)
+        await heuristics.after_response(entry)
+        await heuristics.on_request_successful(entry)
         return entry
