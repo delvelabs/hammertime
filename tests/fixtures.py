@@ -40,10 +40,12 @@ class Pipeline:
         self.kb = KnowledgeBase()
         self.heuristics = Heuristics(kb=self.kb, request_engine=engine)
         self.child_heuristics = Heuristics(kb=self.kb, request_engine=engine)
-        self.add = self.heuristics.add
-        self.add_multiple = self.heuristics.add_multiple
-        self.add_child = self.child_heuristics.add
-        self.add_multiple_child = self.child_heuristics.add_multiple
+
+    def add(self, heuristic, *, with_child=False):
+        self.heuristics.add(heuristic)
+
+        if with_child:
+            self.child_heuristics.add(heuristic)
 
     async def perform_ok(self, entry):
         await self.heuristics.before_request(entry)

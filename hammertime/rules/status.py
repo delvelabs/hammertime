@@ -19,13 +19,13 @@ import asyncio
 from urllib.parse import urljoin, urlparse
 import os
 from collections import defaultdict
-from difflib import SequenceMatcher
 import re
 import random
 import string
 
 from ..ruleset import RejectRequest, StopRequest
 from ..http import Entry
+from .sampling import SignatureComparator
 
 
 class RejectStatusCode:
@@ -43,15 +43,14 @@ class RejectStatusCode:
 
 class DetectSoft404:
 
-    def __init__(self, distance_threshold=5, sample_length=5120,
+    def __init__(self, distance_threshold=5,
                  collect_retry_delay=5.0, confirmation_factor=1):
         self.engine = None
         self.performed = defaultdict(dict)
         self.confirmation_factor = confirmation_factor
         self.soft_404_responses = defaultdict(dict)
         self.collect_retry_delay = collect_retry_delay
-        self.signature_comparator = SignatureComparator(distance_threshold=distance_threshold,
-                                                        sample_length=sample_length)
+        self.signature_comparator = SignatureComparator(distance_threshold=distance_threshold)
 
     def set_engine(self, engine):
         self.engine = engine
@@ -254,85 +253,3 @@ class RejectSoft404:
     async def on_request_successful(self, entry):
         if entry.result.soft404:
             raise RejectRequest("Response to %s is a soft 404." % entry.request)
-
-
-class SignatureComparator:
-
-    def __init__(self, distance_threshold=5, sample_length=5120):
-        self.distance_threshold = distance_threshold
-        self.sample_length = sample_length
-
-    def from_entry(self, entry):
-        response = entry.response
-        return ContentSignature(code=response.code,
-                                content_simhash=entry.result.content_simhash,
-                                content_hash=entry.result.content_hash,
-                                content_sample=self._sample(response.raw, entry.request.url))
-
-    def _sample(self, response, request_url):
-        return response[0:self.sample_length]
-
-    def match(self, entry, signature, *, url):
-        if signature is None:
-            return False
-
-        response = entry.response
-        current = ContentSignature(code=response.code)
-
-        if current.code == signature.code:
-            current.content_hash = entry.result.content_hash
-            if signature.content_hash is not None and signature.content_hash == current.content_hash:
-                return True
-
-            current.content_simhash = entry.result.content_simhash
-            if signature.match_simhash(current, self.distance_threshold):
-                return True
-
-            if self.sample_length > 0:
-                current.content_sample = self._sample(response.raw, url)
-                if signature.match_sample(current):
-                    return True
-
-        return False
-
-    def match_list(self, entry, signature_list, *, url):
-        if signature_list is None:
-            return False
-
-        signature_list = signature_list if isinstance(signature_list, list) else [signature_list]
-
-        for signature in signature_list:
-            if self.match(entry, signature, url=url):
-                return True
-
-        return False
-
-
-class ContentSignature:
-
-    def __init__(self, *, code, content_hash=None, content_sample=None, content_simhash=None):
-        self.code = code
-        self.content_hash = content_hash
-        self.content_sample = content_sample
-        self.content_simhash = content_simhash
-
-    def match_sample(self, other):
-        if self.content_sample is None or other.content_sample is None:
-            return False
-
-        matcher = SequenceMatcher(a=self.content_sample, b=other.content_sample,
-                                  isjunk=None, autojunk=False)
-
-        # This content is almost similar to a generated 404, therefore it's a 404.
-        return matcher.ratio() > 0.8
-
-    def match_simhash(self, other, distance_threshold):
-        if self.content_simhash is None or other.content_simhash is None:
-            return False
-
-        resp_hash = other.content_simhash
-        distance = resp_hash.distance(self.content_simhash)
-        return distance < distance_threshold
-
-    def __eq__(self, other):
-        return self.__dict__ == other.__dict__

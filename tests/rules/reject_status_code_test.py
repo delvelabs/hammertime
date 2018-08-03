@@ -24,8 +24,8 @@ import hashlib
 from aiohttp.test_utils import make_mocked_coro
 
 from fixtures import async_test, Pipeline
-from hammertime.rules.sampling import ContentHashSampling, ContentSimhashSampling
-from hammertime.rules.status import ContentSignature, SignatureComparator
+from hammertime.rules.sampling import ContentHashSampling, ContentSampling, ContentSimhashSampling
+from hammertime.rules.sampling import ContentSignature
 from hammertime.rules import RejectStatusCode, DetectSoft404
 from hammertime.http import Entry, StaticResponse
 from hammertime.ruleset import RejectRequest, StopRequest
@@ -69,10 +69,9 @@ class TestDetectSoft404(TestCase):
         self.rule = DetectSoft404(collect_retry_delay=0.0)
         self.engine = FakeEngine()
         self.runner = Pipeline(engine=self.engine)
-        self.runner.add(ContentHashSampling())
-        self.runner.add(ContentSimhashSampling())
-        self.runner.add_child(ContentHashSampling())
-        self.runner.add_child(ContentSimhashSampling())
+        self.runner.add(ContentHashSampling(), with_child=True)
+        self.runner.add(ContentSampling(), with_child=True)
+        self.runner.add(ContentSimhashSampling(), with_child=True)
         self.runner.add(self.rule)
         self.kb = self.runner.kb
         self.rule.child_heuristics = self.runner.child_heuristics
@@ -334,7 +333,7 @@ class SignatureComparatorTest(TestCase):
         sample_a = '<iframe sandbox="allow-same-origin allow-scripts allow-top-navigation" id="preferredMethod" src="https://www.example.com:2096/unprotected/loader.html?random=Hh2c1OlZNtIkWS8F&amp;goto_uri=%2ffiles.inc" style="display:none;"></iframe>' * 10 # noqa
         sample_b = '<iframe sandbox="allow-same-origin allow-scripts allow-top-navigation" id="preferredMethod" src="https://www.example.com:2096/unprotected/loader.html?random=nsfufafuidafKNUF&amp;goto_uri=%2fabc12345678901234567890.inc" style="display:none;"></iframe>' * 10 # noqa
 
-        comparator = SignatureComparator()
+        comparator = ContentSampling()
         sig_a = ContentSignature(code=200, content_sample=comparator._sample(sample_a, "http://example.com/files.inc"))
         sig_b = ContentSignature(code=200, content_sample=comparator._sample(sample_b, "http://example.com/abc123.inc"))
         self.assertTrue(sig_a.match_sample(sig_b))
