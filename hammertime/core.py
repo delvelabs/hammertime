@@ -149,7 +149,7 @@ class QueueIterator:
         if entry or not self.has_pending():
             self.queue.put_nowait(entry)
 
-    async def __aiter__(self):
+    def __aiter__(self):
         return self
 
     async def __anext__(self):
