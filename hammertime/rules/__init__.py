@@ -18,6 +18,7 @@
 from .body import IgnoreLargeBody
 from .header import SetHeader
 from .status import RejectStatusCode, DetectSoft404, RejectSoft404
+from .sampling import ContentHashSampling, ContentSimhashSampling, ContentSampling
 from .timeout import DynamicTimeout
 from .redirects import FollowRedirects, RejectCatchAllRedirect
 from .deadhostdetection import DeadHostDetection
@@ -26,6 +27,9 @@ from .filterrequestfromurl import FilterRequestFromURL
 
 
 __all__ = [
+    ContentHashSampling,
+    ContentSampling,
+    ContentSimhashSampling,
     DeadHostDetection,
     DetectBehaviorChange,
     DetectSoft404,

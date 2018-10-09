@@ -85,7 +85,7 @@ Parameters:
 * sample_size: the amount of requests used to calculate the timeout. for example, if the sample size is 100, the last 
                100 requests will be used to calculate the timeout. Default is 200.
 
-**class hammertime.rules.DetectSoft404(distance_threshold=5, match_filter=DEFAULT_FILTER, token_size=4)**
+**class hammertime.rules.DetectSoft404(distance_threshold=5, collect_retry_delay=5.0, confirmation_factor=1)**
     
 Detect and flag response for a page not found when a server respond with a 200 for pages not found. 
 ```entry.result.soft404``` is set to ```True ``` if the server responded with a soft 404, else it is set to ```False```.
@@ -94,12 +94,17 @@ Parameters:
 
 * distance_threshold: Minimum count of differing bit between two simhash required to consider two simhash to be 
                       different. Default is 5.
-* match_filter: Regex to filter characters used to compute the simhash of the responses. Default is 
-                r'[\w\u4e00-\u9fcc<>]+'
-* token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
+* collect_retry_delay: Amount of seconds to wait between sampling attempts.
+* confirmation_factor: Amount of samples to collect per pattern. This helps in situations unpredicable responses from the server.
 
 To automatically reject all soft 404s, use the RejectSoft404 heuristic in combination with this heuristic (DetectSoft404
 has to be added before RejectSoft404 to the list of heuristics).
+
+The heuristic requires some content sampling rules to be set-up prior to execution and as part of the child heuristics.
+
+* **hammertime.rules.ContentHashSampling**: Exact matching of the entire response content.
+* **hammertime.rules.ContentSimhashSampling**: A fast tolerant hashing allowing some minor variations in the content.
+* **hammertime.rules.ContentSampling**: Collects the first few bytes of the request and uses a slow sequence matching algorithms. Always used as a last resort.
 
 This heuristic supports [child heuristics](#child-heuristic).
 
@@ -156,9 +161,9 @@ Parameters:
                *buffer_size* responses. Default is 10.
 * match_threshold: The equality threshold in bit when comparing simhash of responses. Two simhash with *match_threshold*
                    or more bit that differ will be unequal. Default is 5.
-* match_filter: Regex to filter characters used to compute the simhash of the responses. Default is 
-                r'[\w\u4e00-\u9fcc<>]+'
-* token_size: length of the tokens used to compute the simhash of the responses. Default is 4.
+
+
+Requires **hammertime.rules.ContentSimhashSampling** to be set-up ahead and as part of the child heuristics.
 
 
 **class hammertime.rules.RejectErrorBehavior()**
