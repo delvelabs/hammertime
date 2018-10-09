@@ -44,13 +44,18 @@ class RejectStatusCode:
 class DetectSoft404:
 
     def __init__(self, distance_threshold=5,
-                 collect_retry_delay=5.0, confirmation_factor=1):
+                 collect_retry_delay=5.0, confirmation_factor=1,
+                 tail_lookup=True):
         self.engine = None
         self.performed = defaultdict(dict)
         self.confirmation_factor = confirmation_factor
         self.soft_404_responses = defaultdict(dict)
         self.collect_retry_delay = collect_retry_delay
         self.signature_comparator = SignatureComparator(distance_threshold=distance_threshold)
+        self.path_generator = SimilarPathGenerator()
+
+        if not tail_lookup:
+            self.path_generator.get_tail_pattern = lambda url, tail: None
 
     def set_engine(self, engine):
         self.engine = engine
@@ -79,48 +84,96 @@ class DetectSoft404:
         # obtained paths do not already have a matching sample. This will avoid multiple
         # requests per sub-path and extension when a catch-all already exists.
         for potential_target in self.enumerate_candidates(url):
-            candidate = await self.get_soft_404_sample(potential_target, fetch_missing=False)
+            candidate = await self.get_soft_404_sample(potential_target,
+                                                       pattern=self.path_generator.get_pattern(potential_target),
+                                                       fetch_missing=False)
             if self.signature_comparator.match_list(entry, candidate, url=url):
                 return True
 
+        if await self._tail_matches(entry):
+            return True
+
         # Fully perform, fetching as required
-        soft_404_response = await self.get_soft_404_sample(url)
+        soft_404_response = await self.get_soft_404_sample(url, pattern=self.path_generator.get_pattern(url))
+        tail_response_a = await self.get_soft_404_sample(url,
+                                                         pattern=self.path_generator.get_tail_pattern(url, tail="\l"))
+        tail_response_b = await self.get_soft_404_sample(url,
+                                                         pattern=self.path_generator.get_tail_pattern(url, tail=".\l"))
+
+        if self.signature_comparator.match_list(entry, soft_404_response, url=url):
+            return True
+
+        # We also want to catch prefix-based rules for which all paths with a common suffix respond with the same
+        if self.signature_comparator.match_list(entry, tail_response_a, url=url):
+            return True
+
+        if self.signature_comparator.match_list(entry, tail_response_b, url=url):
+            return True
 
         if soft_404_response is None:
             raise RejectRequest("Impossible to obtain required sample. Cannot confirm result validity.")
 
-        is_soft_404 = self.signature_comparator.match_list(entry, soft_404_response, url=url)
+        return False
 
-        return is_soft_404
+    async def _tail_matches(self, entry):
+        url = entry.request.url
 
-    async def get_soft_404_sample(self, url, *, fetch_missing=True):
+        # We want to catch if the tail pattern matches parent paths. Common example:
+        # /login has a catch-all rule
+        # /loginuser, login.tar.gz and others all respond with the same page as /login
+        tail_start = url.rfind("/")
+        for i in range(tail_start + 2, len(url)):
+            potential_target = url[0:i]
+
+            # Any character not part of a valid prefix is ignored.
+            if potential_target[-1] not in self.path_generator.tail_chars:
+                break
+
+            # Check if we know these patterns without fetching
+            # The addition to kb on found paths happens by the post-request process
+            pattern = potential_target + "\l"
+            candidate = await self.get_soft_404_sample(potential_target,
+                                                       pattern=pattern,
+                                                       fetch_missing=False)
+            if self.signature_comparator.match_list(entry, candidate, url=url):
+                return True
+
+            pattern = potential_target + ".\l"
+            candidate = await self.get_soft_404_sample(potential_target,
+                                                       pattern=pattern,
+                                                       fetch_missing=False)
+            if self.signature_comparator.match_list(entry, candidate, url=url):
+                return True
+
+        return False
+
+    async def get_soft_404_sample(self, url, *, pattern, fetch_missing=True):
         server_address = urljoin(url, "/")
-        if self._is_home(url):
+        if self._is_home(url) or pattern is None:
             return None
 
         # If we have a match, leave right away
-        request_url_pattern = self._extract_pattern_from_url(url)
-        if request_url_pattern in self.soft_404_responses[server_address]:
-            return self.soft_404_responses[server_address][request_url_pattern]
+        if pattern in self.soft_404_responses[server_address]:
+            return self.soft_404_responses[server_address][pattern]
 
         if not fetch_missing:
             return None
 
-        if request_url_pattern not in self.performed[server_address]:
+        if pattern not in self.performed[server_address]:
             try:
                 # Temporarily assign a future to make sure work is not done twice
-                self.performed[server_address][request_url_pattern] = asyncio.Future()
-                response = await self._collect_sample(url, request_url_pattern)
-                self.soft_404_responses[server_address][request_url_pattern] = response
+                self.performed[server_address][pattern] = asyncio.Future()
+                response = await self._collect_sample(url, pattern)
+                self.soft_404_responses[server_address][pattern] = response
             except (StopRequest, RejectRequest) as e:
-                self.soft_404_responses[server_address][request_url_pattern] = None
+                self.soft_404_responses[server_address][pattern] = None
             finally:
                 # Remove the wait lock
-                self.performed[server_address][request_url_pattern].set_result(True)
-                self.performed[server_address][request_url_pattern] = None
-        elif self.performed[server_address][request_url_pattern] is not None:
-            await self.performed[server_address][request_url_pattern]
-        return self.soft_404_responses[server_address][request_url_pattern]
+                self.performed[server_address][pattern].set_result(True)
+                self.performed[server_address][pattern] = None
+        elif self.performed[server_address][pattern] is not None:
+            await self.performed[server_address][pattern]
+        return self.soft_404_responses[server_address][pattern]
 
     def _is_home(self, url):
         server_address = urljoin(url, "/")
@@ -136,14 +189,15 @@ class DetectSoft404:
         """
         samples = []
 
-        urls = [self._create_random_url(url, url_pattern) for _ in range(self.confirmation_factor)]
+        urls = [self.path_generator.generate_url(url, url_pattern) for _ in range(self.confirmation_factor)]
+
         iterator = asyncio.as_completed([self._fetch_sample(url) for url in urls])
         for promise in iterator:
             try:
                 sig = await promise
                 if sig:
                     samples.append(sig)
-            except RejectRequest:
+            except RejectRequest as e:
                 pass
 
         if not samples:
@@ -172,7 +226,19 @@ class DetectSoft404:
             yield urljoin(url, path) + "/"
             path, _ = os.path.split(path)
 
-    def _extract_pattern_from_url(self, url):
+
+class RejectSoft404:
+
+    async def on_request_successful(self, entry):
+        if entry.result.soft404:
+            raise RejectRequest("Response to %s is a soft 404." % entry.request)
+
+
+class SimilarPathGenerator:
+    tail_pattern = re.compile(r'/([a-z-]+)((\.[a-z0-9\.]*[\a-z0-9])|/)$')
+    tail_chars = set("abcdefghijklmnopqrstuvwxyz-")
+
+    def get_pattern(self, url):
         """Return the path part of the URL with the last element replaced with its pattern in a regex-like format:
         \l -> lowercase letters, same as [a-z]+
         \L -> uppercase letters, same as [A-Z]+
@@ -184,47 +250,22 @@ class DetectSoft404:
         path = urlparse(url).path
         directories, filename = os.path.split(path)
         if len(filename) > 0:
-            pattern = self._get_pattern_for_filename(filename)
+            pattern = self.get_pattern_for_filename(filename)
             if directories[-1] != "/":
                 directories += "/"
             return directories + pattern
         else:
-            return self._get_pattern_for_directory(directories)
+            return self.get_pattern_for_directory(directories)
 
-    def _get_pattern_for_directory(self, directory_path):
-        if directory_path == "/":
-            return "/"
-        directory_path = directory_path.strip("/")
-        directories = directory_path.split("/")
-        if len(directories) > 1:
-            directory_pattern = self._create_pattern_from_string(directories[-1])
-            return "/%s/%s/" % ("/".join(directories[:-1]), directory_pattern)
+    def get_tail_pattern(self, url, tail="\l"):
+        path = urlparse(url).path
+        out = self.tail_pattern.sub(r"/\1" + tail, path)
+        if path != out:
+            return urljoin(url, out)
         else:
-            return "/%s/" % self._create_pattern_from_string(directories[0])
+            return None
 
-    def _get_pattern_for_filename(self, filename):
-        filename, extension = os.path.splitext(filename)
-        return self._create_pattern_from_string(filename) + extension
-
-    def _create_pattern_from_string(self, string):
-        parts = re.split("\W", string)
-        pattern = re.sub("\w+", "{}", string)
-        pattern_list = []
-        for part in parts:
-            if len(part) > 0:
-                if re.fullmatch("[a-z]+", part):
-                    pattern_list.append("\l")
-                elif re.fullmatch("[A-Z]+", part):
-                    pattern_list.append("\L")
-                elif re.fullmatch("[a-zA-Z]+", part):
-                    pattern_list.append("\i")
-                elif re.fullmatch("\d+", part):
-                    pattern_list.append("\d")
-                else:
-                    pattern_list.append("\w")
-        return pattern.format(*pattern_list)
-
-    def _create_random_url(self, url, path):
+    def generate_url(self, url, path):
         replace_patterns = ["\l", "\L", "\i", "\d", "\w"]
         for pattern in replace_patterns:
             path = path.replace(pattern, self._create_random_string(pattern, random.randint(8, 15)))
@@ -247,9 +288,35 @@ class DetectSoft404:
         else:
             return ""
 
+    def get_pattern_for_directory(self, directory_path):
+        if directory_path == "/":
+            return "/"
+        directory_path = directory_path.strip("/")
+        directories = directory_path.split("/")
+        if len(directories) > 1:
+            directory_pattern = self._create_pattern_from_string(directories[-1])
+            return "/%s/%s/" % ("/".join(directories[:-1]), directory_pattern)
+        else:
+            return "/%s/" % self._create_pattern_from_string(directories[0])
 
-class RejectSoft404:
+    def get_pattern_for_filename(self, filename):
+        filename, extension = os.path.splitext(filename)
+        return self._create_pattern_from_string(filename) + extension
 
-    async def on_request_successful(self, entry):
-        if entry.result.soft404:
-            raise RejectRequest("Response to %s is a soft 404." % entry.request)
+    def _create_pattern_from_string(self, string):
+        parts = re.split("\W", string)
+        pattern = re.sub("\w+", "{}", string)
+        pattern_list = []
+        for part in parts:
+            if len(part) > 0:
+                if re.fullmatch("[a-z]+", part):
+                    pattern_list.append("\l")
+                elif re.fullmatch("[A-Z]+", part):
+                    pattern_list.append("\L")
+                elif re.fullmatch("[a-zA-Z]+", part):
+                    pattern_list.append("\i")
+                elif re.fullmatch("\d+", part):
+                    pattern_list.append("\d")
+                else:
+                    pattern_list.append("\w")
+        return pattern.format(*pattern_list)

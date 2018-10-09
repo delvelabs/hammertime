@@ -48,6 +48,9 @@ class DetectBehaviorChange:
             return
 
         content_simhash = entry.result.content_simhash
+        if content_simhash is None:
+            entry.result.error_behavior = False
+            return
 
         if any(content_simhash.distance(Simhash(known)) < self.match_threshold for known in self.known_bad_behavior):
             entry.result.error_behavior = True
