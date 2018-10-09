@@ -259,7 +259,7 @@ class SimilarPathGenerator:
 
     def get_tail_pattern(self, url, tail="\l"):
         path = urlparse(url).path
-        out = self.tail_pattern.sub(r"/\1" + re.escape(tail), path)
+        out = self.tail_pattern.sub(r"/\1" + tail.replace("\\", "\\\\"), path)
         if path != out:
             return urljoin(url, out)
         else:
