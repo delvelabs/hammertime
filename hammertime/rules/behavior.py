@@ -16,12 +16,18 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from hammertime.ruleset import RejectRequest
-from hammertime.rules.simhash import Simhash, DEFAULT_FILTER
+from hammertime.rules.simhash import Simhash
 
 
 class DetectBehaviorChange:
+    """
+    Considers responses bad if the same response is provided `buffer_size` amount of times
+    consecutively.
 
-    def __init__(self, buffer_size=10, match_threshold=5, match_filter=DEFAULT_FILTER, token_size=4,
+    This heuristic uses simhash and requires `ContentSimhashSampling` to be configured in advance.
+    """
+
+    def __init__(self, buffer_size=10, match_threshold=5,
                  safe_status_codes=None):
         self.safe_status_codes = safe_status_codes or {401, 403, 404}
         self.behavior_buffer = []
@@ -29,8 +35,6 @@ class DetectBehaviorChange:
         self.max_buffer_size = buffer_size
         self.error_behavior = False
         self.match_threshold = match_threshold
-        self.match_filter = match_filter
-        self.token_size = token_size
 
     def set_kb(self, kb):
         kb.bad_behavior_response = self.known_bad_behavior
@@ -43,9 +47,10 @@ class DetectBehaviorChange:
             entry.result.error_behavior = False
             return
 
-        resp_content = self._read_content(entry.response)
-        content_simhash = self._hash(resp_content)
-        entry.result.error_simhash = content_simhash.value
+        content_simhash = entry.result.content_simhash
+        if content_simhash is None:
+            entry.result.error_behavior = False
+            return
 
         if any(content_simhash.distance(Simhash(known)) < self.match_threshold for known in self.known_bad_behavior):
             entry.result.error_behavior = True
@@ -64,9 +69,6 @@ class DetectBehaviorChange:
 
     def _is_error_behavior(self, content_simhash):
         return all(self._responses_match(content_simhash))
-
-    def _hash(self, content):
-        return Simhash(content, filter=self.match_filter, token_size=self.token_size)
 
     def _read_content(self, response):
         return response.raw.decode('utf-8', errors='ignore')

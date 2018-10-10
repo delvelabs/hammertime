@@ -21,6 +21,8 @@ from functools import wraps
 from aiohttp.test_utils import loop_context
 
 from easyinject import Injector
+from hammertime.ruleset import Heuristics
+from hammertime.kb import KnowledgeBase
 
 try:
     from freezegun import freeze_time
@@ -30,6 +32,26 @@ except ImportError:
             return unittest.skip("freezegun is required")(f)
 
         return setup
+
+
+class Pipeline:
+
+    def __init__(self, *, engine=None):
+        self.kb = KnowledgeBase()
+        self.heuristics = Heuristics(kb=self.kb, request_engine=engine)
+        self.child_heuristics = Heuristics(kb=self.kb, request_engine=engine)
+
+    def add(self, heuristic, *, with_child=False):
+        self.heuristics.add(heuristic)
+
+        if with_child:
+            self.child_heuristics.add(heuristic)
+
+    async def perform_ok(self, entry):
+        await self.heuristics.before_request(entry)
+        await self.heuristics.after_headers(entry)
+        await self.heuristics.after_response(entry)
+        await self.heuristics.on_request_successful(entry)
 
 
 def async_test():
