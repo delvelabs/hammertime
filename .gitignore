@@ -16,10 +16,13 @@ data/
 bin/
 include/
 lib/
+lib64
+dist/
 man/
 share/
 src/
 pip-selfcheck.json
+pyvenv.cfg
 
 # cookies
 cookies*
