@@ -16,9 +16,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+import re
 from copy import copy
-from urllib.parse import urljoin, urlparse
 from uuid import uuid4
+from difflib import SequenceMatcher
+from urllib.parse import urljoin, urlparse
 
 from hammertime.http import Entry
 from hammertime.ruleset import RejectRequest
@@ -50,7 +52,7 @@ class FollowRedirects:
         redirect_count = 0
         while status_code in valid_redirects:
             if redirect_count > self.max_redirect:
-                raise RejectRequest("Max redirect limit reached")
+                raise RejectRedirection("Max redirect limit reached")
             try:
                 url = entry.response.headers["location"]
                 last_url = entry.result.redirects[-1].request.url
@@ -60,7 +62,7 @@ class FollowRedirects:
                 status_code = entry.response.code
                 redirect_count += 1
             except KeyError:
-                raise RejectRequest("Missing location field in header of redirect")
+                raise RejectRedirection("Missing location field in header of redirect")
 
     async def _perform_request(self, url, base_url):
         entry = Entry.create(urljoin(base_url, url))
@@ -104,7 +106,7 @@ class RejectCatchAllRedirect:
             norm_default = self._normalize(default_redirect_for_path, random_url)
 
             if norm_request == norm_default:
-                raise RejectRequest("Catch-all redirect rejected: {} redirected to {}".format(
+                raise RejectRedirection("Catch-all redirect rejected: {} redirected to {}".format(
                     url, default_redirect_for_path))
 
     async def _get_default_redirect_for_path(self, path, random_url):
@@ -146,3 +148,38 @@ class RejectCatchAllRedirect:
         if urlparse(url).netloc == "":
             return urljoin(base_url, url)
         return url
+
+
+class RedirectLimiter:
+
+    def __init__(self, sequence_matching=True):
+        self.sequence_matching = sequence_matching
+        self.digits = re.compile(r'\d+')
+        self.not_found = re.compile(r'not[-_]*found', re.I)
+
+    async def after_headers(self, entry):
+        if entry.response.code not in valid_redirects:
+            return
+
+        location = entry.response.headers.get("location")
+        if not location:
+            return
+
+        if "404" in self.digits.findall(location):
+            raise RejectRedirection("Redirection to error page: %s" % location)
+        if self.not_found.search(location):
+            raise RejectRedirection("Redirection to error page: %s" % location)
+
+        if self.sequence_matching and self._sequences_differ(entry.request.url, location):
+            raise RejectRedirection("Redirection to unrelated path: %s" % location)
+
+    def _sequences_differ(self, request, redirect):
+        a = urlparse(request).path
+        b = urlparse(redirect).path
+
+        matcher = SequenceMatcher(isjunk=None, a=a, b=b, autojunk=False)
+        return round(matcher.ratio(), 1) <= 0.8
+
+
+class RejectRedirection(RejectRequest):
+    pass
