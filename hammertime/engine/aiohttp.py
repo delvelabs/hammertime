@@ -22,6 +22,7 @@ from aiohttp.client_exceptions import ClientOSError, ClientResponseError, Server
 from aiohttp.cookiejar import DummyCookieJar
 import asyncio
 from async_timeout import timeout
+import re
 import ssl
 
 from ..ruleset import StopRequest, RejectRequest
@@ -149,12 +150,12 @@ class Response:
         if self.truncated:
             return self.partial_content
         else:
-            return self.raw.decode('utf-8')
+            return self._decode()
 
     @property
     def partial_content(self):
         try:
-            return self.raw.decode("utf-8")
+            return self._decode()
         except UnicodeDecodeError as decode_error:
             longest_bytes_sequence_in_utf8 = 4
             if decode_error.start >= len(self.raw) - longest_bytes_sequence_in_utf8:
@@ -162,6 +163,31 @@ class Response:
                 return self.raw.decode("utf-8", errors="ignore")
             else:
                 raise decode_error
+
+    def _decode(self):
+        try:
+            return self.raw.decode("utf-8")
+        except UnicodeDecodeError:
+            encoding = self._find_encoding()
+            if encoding is not None:
+                return self.raw.decode(encoding)
+            raise
+
+    def _find_encoding(self):
+        content_type = self.headers.get("content-type", None)
+        if content_type is not None:
+            match = re.search("(?<=charset=)([a-zA-Z0-9-]+)", content_type)
+            if match:
+                return match.group()
+
+        match = re.search(b"(?<=charset=)([a-zA-Z0-9-]+)", self.raw)
+        if match:
+            encoding = match.group()
+            try:
+                return encoding.decode("utf-8")  # Let's hope the encoding itself can be read as utf-8
+            except UnicodeDecodeError:
+                pass
+        return None
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
