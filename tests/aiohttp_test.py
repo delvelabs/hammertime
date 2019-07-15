@@ -140,6 +140,42 @@ class TestResponse(TestCase):
         with self.assertRaises(UnicodeDecodeError):
             response.partial_content
 
+    def test_content_find_content_encoding_if_utf8_fails(self):
+        raw_bytes = '<html><head>' \
+                    '<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">' \
+                    '</head><body>abcdé</body></html>'.encode("iso-8859-1")
+        response = Response(200, {})
+        response.set_content(raw_bytes, True)
+
+        self.assertEqual(response.content, raw_bytes.decode("iso-8859-1"))
+
+    def test_partial_content_find_encoding_if_utf8_fails(self):
+        raw_bytes = '<html><head>' \
+                    '<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2">' \
+                    '</head><body>abcdé</body></html>'.encode("iso-8859-2")
+        response = Response(200, {})
+        response.set_content(raw_bytes[:-10], False)
+
+        self.assertEqual(response.partial_content, raw_bytes.decode("iso-8859-2")[:-10])
+
+    def test_content_use_encoding_in_mimetype_if_present(self):
+        raw_bytes = "abcdé".encode("iso-8859-1")
+        response = Response(200, {"content-type": "text/html; charset=iso-8859-1"})
+        response.set_content(raw_bytes, True)
+
+        self.assertEqual(response.content, raw_bytes.decode("iso-8859-1"))
+
+    def test_content_dont_decode_twice_if_utf8_is_invalid(self):
+        raw_bytes = MagicMock()
+        raw_bytes.decode.side_effect = UnicodeDecodeError("utf-8", b"abc", 1, 2, "reason")
+        response = Response(200, {"content-type": "text/html; charset=utf-8"})
+        response.set_content(raw_bytes, at_eof=True)
+
+        with self.assertRaises(UnicodeDecodeError):
+            response.content
+
+        raw_bytes.decode.assert_called_once_with("utf-8")
+
 
 class FakeResponse:
 
