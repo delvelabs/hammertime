@@ -165,6 +165,17 @@ class TestResponse(TestCase):
 
         self.assertEqual(response.content, raw_bytes.decode("iso-8859-1"))
 
+    def test_content_dont_decode_twice_if_utf8_is_invalid(self):
+        raw_bytes = MagicMock()
+        raw_bytes.decode.side_effect = UnicodeDecodeError("utf-8", b"abc", 1, 2, "reason")
+        response = Response(200, {"content-type": "text/html; charset=utf-8"})
+        response.set_content(raw_bytes, at_eof=True)
+
+        with self.assertRaises(UnicodeDecodeError):
+            response.content
+
+        raw_bytes.decode.assert_called_once_with("utf-8")
+
 
 class FakeResponse:
 

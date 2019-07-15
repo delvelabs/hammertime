@@ -169,7 +169,7 @@ class Response:
             return self.raw.decode("utf-8")
         except UnicodeDecodeError:
             encoding = self._find_encoding()
-            if encoding is not None:
+            if encoding is not None and encoding.lower() != "utf-8":
                 return self.raw.decode(encoding)
             raise
 
