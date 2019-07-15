@@ -180,7 +180,7 @@ class Response:
             if match:
                 return match.group()
 
-        match = re.search(b"(?<=charset=)([a-zA-Z0-9-]+)", self.raw)
+        match = re.search(b"(?<=charset=)([a-zA-Z0-9-]+)", self.raw[:2000])
         if match:
             encoding = match.group()
             try:
