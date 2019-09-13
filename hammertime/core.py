@@ -23,6 +23,7 @@ from collections import deque
 from .http import Entry
 from .ruleset import Heuristics, HammerTimeException
 from .engine import RetryEngine
+from .engine.scaling import Policy
 from .requestscheduler import RequestScheduler
 import signal
 
@@ -32,11 +33,13 @@ logger = logging.getLogger(__name__)
 
 class HammerTime:
 
-    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0, proxy=None):
+    def __init__(self, loop=None, request_engine=None, kb=None, retry_count=0, proxy=None,
+                 scale_policy: Policy = None):
         self.loop = loop
         self.stats = Stats()
 
-        self.request_engine = RetryEngine(request_engine, loop=loop, stats=self.stats, retry_count=retry_count)
+        self.request_engine = RetryEngine(request_engine, loop=loop, stats=self.stats, retry_count=retry_count,
+                                          scale_policy=scale_policy)
         if proxy is not None:
             self.request_engine.set_proxy(proxy)
         self.heuristics = Heuristics(kb=kb, request_engine=self.request_engine)
