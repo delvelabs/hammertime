@@ -16,20 +16,24 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import asyncio
+from time import time
 from weakref import ref as weakref
 
 from . import Engine
+from .scaling import Policy, StaticPolicy
 from ..ruleset import StopRequest
 
 
 class RetryEngine(Engine):
 
-    def __init__(self, engine, *, loop, stats, retry_count=0, retry_delay=1.0):
+    def __init__(self, engine, *, loop, stats, retry_count=0, retry_delay=1.0,
+                 scale_policy: Policy = None):
+        self.scale_policy = scale_policy or StaticPolicy(30)
         self.request_engine = engine
         self.retry_count = retry_count
         self.stats = stats
-        self.general_limiter = asyncio.Semaphore(50, loop=loop)
-        self.priority_limiter = asyncio.Semaphore(10, loop=loop)
+        self.general_limiter = self.scale_policy.get_semaphore()
+        self.priority_limiter = asyncio.Semaphore(3, loop=loop)
         self.default_heuristics = None
         self.retry_delay = retry_delay
 
@@ -45,7 +49,9 @@ class RetryEngine(Engine):
     async def _perform(self, limiter, entry, heuristics):
         while True:
             try:
+                begin = time()  # Setting ahead to make sure we do not get undefined on error / termination
                 async with limiter:
+                    begin = time()
                     entry = await self.request_engine.perform(entry, heuristics=heuristics)
                 await heuristics.on_request_successful(entry)
                 return entry
@@ -57,6 +63,8 @@ class RetryEngine(Engine):
                     self.stats.retries += 1
                     entry.response = None
                     await asyncio.sleep(self.retry_delay)
+            finally:
+                await self.scale_policy.record(duration=time() - begin)
 
     async def close(self):
         if self.request_engine is not None:
