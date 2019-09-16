@@ -47,8 +47,8 @@ class ScalingPolicyTest(unittest.TestCase):
     @async_test()
     async def test_intermim_cohorts_get_discarded(self):
         policy = SlowStartPolicy(initial=3, cohort_size=1)
-        _ = await policy.record(duration=15)   # Discard
-        _ = await policy.record(duration=10.5)  # Stay
+        await policy.record(duration=15)   # Discard
+        await policy.record(duration=10.5)  # Stay
         c = await policy.record(duration=10.5)  # Scale up
         d = await policy.record(duration=11.5)  # Discard
         e = await policy.record(duration=10.5)  # Scale up
@@ -58,9 +58,9 @@ class ScalingPolicyTest(unittest.TestCase):
     @async_test()
     async def test_slight_increase_in_time_is_tolerated(self):
         policy = SlowStartPolicy(initial=3, cohort_size=1)
-        _ = await policy.record(duration=15)   # Discard
-        _ = await policy.record(duration=10.5)  # Stay
-        _ = await policy.record(duration=10.5)  # Scale up
+        await policy.record(duration=15)   # Discard
+        await policy.record(duration=10.5)  # Stay
+        await policy.record(duration=10.5)  # Scale up
         d = await policy.record(duration=11.5)  # Discard
         e = await policy.record(duration=10.508)  # Scale up
 
@@ -69,9 +69,9 @@ class ScalingPolicyTest(unittest.TestCase):
     @async_test()
     async def test_slight_decrease_is_accepted(self):
         policy = SlowStartPolicy(initial=3, cohort_size=1)
-        _ = await policy.record(duration=15)   # Discard
-        _ = await policy.record(duration=10.5)  # Stay
-        _ = await policy.record(duration=10.5)  # Scale up
+        await policy.record(duration=15)   # Discard
+        await policy.record(duration=10.5)  # Stay
+        await policy.record(duration=10.5)  # Scale up
         d = await policy.record(duration=11.5)  # Discard
         e = await policy.record(duration=10.498)  # Scale up
 
@@ -80,7 +80,7 @@ class ScalingPolicyTest(unittest.TestCase):
     @async_test()
     async def test_large_increase_reverts(self):
         policy = SlowStartPolicy(initial=3, cohort_size=1)
-        _ = await policy.record(duration=15)   # Discard
+        await policy.record(duration=15)   # Discard
         b = await policy.record(duration=10.5)  # Stay
         c = await policy.record(duration=10.5)  # Scale up
         d = await policy.record(duration=11.5)  # Discard
@@ -91,12 +91,12 @@ class ScalingPolicyTest(unittest.TestCase):
     @async_test()
     async def test_not_scaling_back_up_after_ceiling_reached(self):
         policy = SlowStartPolicy(initial=3, cohort_size=1)
-        _ = await policy.record(duration=15)   # Discard
+        await policy.record(duration=15)   # Discard
         b = await policy.record(duration=10.5)  # Stay
-        _ = await policy.record(duration=10.5)  # Scale up
-        _ = await policy.record(duration=11.5)  # Discard
+        await policy.record(duration=10.5)  # Scale up
+        await policy.record(duration=11.5)  # Discard
         e = await policy.record(duration=12.7)  # Backtrack / cooldown
-        _ = await policy.record(duration=10.7)  # Discard
+        await policy.record(duration=10.7)  # Discard
         g = await policy.record(duration=10.5)  # Scale back up
         h = await policy.record(duration=10.5)  # Stay
 
