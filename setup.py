@@ -22,7 +22,7 @@ setup(name='HammerTime-http',
       install_requires=[
           'aiohttp>=3.1.0,<3.6.0',
           'easyinject==0.3',
-          'aiodns>=1.1.1,<1.2.0',
+          'aiodns>=1.1.1,<3.0.0',
           'simhash>=1.8.0,<1.9.0'
       ],
       license="GPLv2"
