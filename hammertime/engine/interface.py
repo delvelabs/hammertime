@@ -19,7 +19,7 @@
 class Engine:
 
     async def perform(self, entry, heuristics):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     async def close(self):
         pass

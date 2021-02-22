@@ -96,9 +96,9 @@ class DetectSoft404:
         # Fully perform, fetching as required
         soft_404_response = await self.get_soft_404_sample(url, pattern=self.path_generator.get_pattern(url))
         tail_response_a = await self.get_soft_404_sample(url,
-                                                         pattern=self.path_generator.get_tail_pattern(url, tail="\l"))
+                                                         pattern=self.path_generator.get_tail_pattern(url, tail="\\l"))
         tail_response_b = await self.get_soft_404_sample(url,
-                                                         pattern=self.path_generator.get_tail_pattern(url, tail=".\l"))
+                                                         pattern=self.path_generator.get_tail_pattern(url, tail=".\\l"))
 
         if self.signature_comparator.match_list(entry, soft_404_response, url=url):
             return True
@@ -131,14 +131,14 @@ class DetectSoft404:
 
             # Check if we know these patterns without fetching
             # The addition to kb on found paths happens by the post-request process
-            pattern = potential_target + "\l"
+            pattern = potential_target + "\\l"
             candidate = await self.get_soft_404_sample(potential_target,
                                                        pattern=pattern,
                                                        fetch_missing=False)
             if self.signature_comparator.match_list(entry, candidate, url=url):
                 return True
 
-            pattern = potential_target + ".\l"
+            pattern = potential_target + ".\\l"
             candidate = await self.get_soft_404_sample(potential_target,
                                                        pattern=pattern,
                                                        fetch_missing=False)
@@ -165,7 +165,7 @@ class DetectSoft404:
                 self.performed[server_address][pattern] = asyncio.Future()
                 response = await self._collect_sample(url, pattern)
                 self.soft_404_responses[server_address][pattern] = response
-            except (StopRequest, RejectRequest) as e:
+            except (StopRequest, RejectRequest):
                 self.soft_404_responses[server_address][pattern] = None
             finally:
                 # Remove the wait lock
@@ -197,7 +197,7 @@ class DetectSoft404:
                 sig = await promise
                 if sig:
                     samples.append(sig)
-            except RejectRequest as e:
+            except RejectRequest:
                 pass
 
         if not samples:
@@ -240,11 +240,11 @@ class SimilarPathGenerator:
 
     def get_pattern(self, url):
         """Return the path part of the URL with the last element replaced with its pattern in a regex-like format:
-        \l -> lowercase letters, same as [a-z]+
-        \L -> uppercase letters, same as [A-Z]+
-        \i -> letters ignoring case, same as [a-zA-Z]+
-        \d -> digits, same as \d+
-        \w -> word characters (letters, digits, underscores), same as \w+
+        \\l -> lowercase letters, same as [a-z]+
+        \\L -> uppercase letters, same as [A-Z]+
+        \\i -> letters ignoring case, same as [a-zA-Z]+
+        \\d -> digits, same as \\d+
+        \\w -> word characters (letters, digits, underscores), same as \\w+
         All other characters match themselves
         """
         path = urlparse(url).path
@@ -257,7 +257,7 @@ class SimilarPathGenerator:
         else:
             return self.get_pattern_for_directory(directories)
 
-    def get_tail_pattern(self, url, tail="\l"):
+    def get_tail_pattern(self, url, tail="\\l"):
         path = urlparse(url).path
         out = self.tail_pattern.sub(r"/\1" + tail.replace("\\", "\\\\"), path)
         if path != out:
@@ -266,22 +266,22 @@ class SimilarPathGenerator:
             return None
 
     def generate_url(self, url, path):
-        replace_patterns = ["\l", "\L", "\i", "\d", "\w"]
+        replace_patterns = ["\\l", "\\L", "\\i", "\\d", "\\w"]
         for pattern in replace_patterns:
             path = path.replace(pattern, self._create_random_string(pattern, random.randint(8, 15)))
         return urljoin(url, path)
 
     def _create_random_string(self, pattern, length):
         choices = None
-        if pattern == "\l":
+        if pattern == "\\l":
             choices = string.ascii_lowercase
-        elif pattern == "\L":
+        elif pattern == "\\L":
             choices = string.ascii_uppercase
-        elif pattern == "\i":
+        elif pattern == "\\i":
             choices = string.ascii_letters
-        elif pattern == "\w":
+        elif pattern == "\\w":
             choices = string.ascii_letters + string.digits + "_"
-        elif pattern == "\d":
+        elif pattern == "\\d":
             choices = string.digits
         if choices is not None:
             return "".join([random.choice(choices) for _ in range(length)])
@@ -304,19 +304,19 @@ class SimilarPathGenerator:
         return self._create_pattern_from_string(filename) + extension
 
     def _create_pattern_from_string(self, string):
-        parts = re.split("\W", string)
-        pattern = re.sub("\w+", "{}", string)
+        parts = re.split("\\W", string)
+        pattern = re.sub("\\w+", "{}", string)
         pattern_list = []
         for part in parts:
             if len(part) > 0:
                 if re.fullmatch("[a-z]+", part):
-                    pattern_list.append("\l")
+                    pattern_list.append("\\l")
                 elif re.fullmatch("[A-Z]+", part):
-                    pattern_list.append("\L")
+                    pattern_list.append("\\L")
                 elif re.fullmatch("[a-zA-Z]+", part):
-                    pattern_list.append("\i")
-                elif re.fullmatch("\d+", part):
-                    pattern_list.append("\d")
+                    pattern_list.append("\\i")
+                elif re.fullmatch("\\d+", part):
+                    pattern_list.append("\\d")
                 else:
-                    pattern_list.append("\w")
+                    pattern_list.append("\\w")
         return pattern.format(*pattern_list)

@@ -110,7 +110,7 @@ class TestDetectSoft404(TestCase):
         with self.assertRaises(RejectRequest):
             await self.runner.perform_ok(self.create_entry("http://example.com/test"))
 
-        self.assertEqual(self.rule.performed["http://example.com/"]["/\l"], None)
+        self.assertEqual(self.rule.performed["http://example.com/"]["/\\l"], None)
 
     @async_test()
     async def test_add_alternate_url_response_to_knowledge_base(self):
@@ -129,10 +129,10 @@ class TestDetectSoft404(TestCase):
 
         raw = ContentHashSampling()._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-            "/\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
-            "/\d/": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
-            "/.\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
-            "/123/\l.js": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)]})
+            "/\\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
+            "/\\d/": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
+            "/.\\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
+            "/123/\\l.js": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)]})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):
@@ -142,7 +142,7 @@ class TestDetectSoft404(TestCase):
             await self.runner.perform_ok(self.create_entry("http://example.com/test",
                                                            response_content="response"))
 
-        self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {"/\l": None})
+        self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {"/\\l": None})
 
     @async_test()
     async def test_add_hash_of_raw_content_if_response_content_of_sample_is_not_text(self):
@@ -154,7 +154,7 @@ class TestDetectSoft404(TestCase):
         await self.runner.perform_ok(self.create_entry("http://example.com/test", response_content="response"))
 
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-                "/\l": [ContentSignature(code=200, content_hash=hashlib.md5(bytes).digest(), content_sample=ANY)]})
+                "/\\l": [ContentSignature(code=200, content_hash=hashlib.md5(bytes).digest(), content_sample=ANY)]})
 
     @async_test()
     async def test_mutliple_values_for_sample_url(self):
@@ -172,7 +172,7 @@ class TestDetectSoft404(TestCase):
 
     @async_test()
     async def test_mark_request_has_soft404_if_pattern_and_response_match_request_in_knowledge_base(self):
-        for pattern in ["/test/\d.html", "/\d-\l.js", "/\L/", "/\i", "/abc/.\l.js"]:
+        for pattern in ["/test/\\d.html", "/\\d-\\l.js", "/\\L/", "/\\i", "/abc/.\\l.js"]:
             simhash = Simhash("response content")
             self.kb.soft_404_responses["http://example.com/"][pattern] = ContentSignature(code=200,
                                                                                           content_simhash=simhash)
@@ -189,7 +189,7 @@ class TestDetectSoft404(TestCase):
     @async_test()
     async def test_dont_mark_as_soft404_if_no_match_in_knowledge_base(self):
         simhash = Simhash("response content")
-        for pattern in ["/\l.html", "/\l", "/.\l", "/\l.php"]:
+        for pattern in ["/\\l.html", "/\\l", "/.\\l", "/\\l.php"]:
             self.kb.soft_404_responses["http://example.com/"][pattern] = ContentSignature(code=200,
                                                                                           content_simhash=simhash)
             self.rule.performed["http://example.com/"][pattern] = None
@@ -204,8 +204,8 @@ class TestDetectSoft404(TestCase):
 
     @async_test()
     async def test_dont_mark_as_soft404_if_response_in_knowledge_base_is_none(self):
-        self.kb.soft_404_responses["http://example.com/"]["/\l"] = None
-        self.rule.performed["http://example.com/"] = {"/\l": None}
+        self.kb.soft_404_responses["http://example.com/"]["/\\l"] = None
+        self.rule.performed["http://example.com/"] = {"/\\l": None}
         entry = self.create_entry("http://example.com/test", response_content="test")
 
         with self.assertRaises(RejectRequest):
@@ -217,8 +217,8 @@ class TestDetectSoft404(TestCase):
     async def test_compare_hash_of_raw_content_if_raw_content_hash_in_knowledge_base(self):
         raw = b'Invalid UTF8 x\x80Z"'
         _hash = hashlib.md5(raw).digest()
-        self.kb.soft_404_responses["http://example.com/"]["/\l"] = ContentSignature(code=200, content_hash=_hash)
-        self.rule.performed["http://example.com/"] = {"/\l": None}
+        self.kb.soft_404_responses["http://example.com/"]["/\\l"] = ContentSignature(code=200, content_hash=_hash)
+        self.rule.performed["http://example.com/"] = {"/\\l": None}
         response = Response(200, {})
         response.set_content(raw, True)
         entry = Entry.create("http://example.com/test", response=response)
@@ -230,7 +230,7 @@ class TestDetectSoft404(TestCase):
     @async_test()
     async def test_homepage_do_not_count_as_soft_404(self):
         simhash = Simhash("response content")
-        for pattern in ["/\l/\d.html", "/\d-\l.js", "/\L/", "/\i", "/.\l.js"]:
+        for pattern in ["/\\l/\\d.html", "/\\d-\\l.js", "/\\L/", "/\\i", "/.\\l.js"]:
             self.kb.soft_404_responses["http://example.com/"][pattern] = {"code": 200, "content_simhash": simhash}
             self.rule.performed["http://example.com/"] = {pattern: None}
         entry = self.create_entry("http://example.com/", response_content="home page")
@@ -289,8 +289,8 @@ class SimilarPathGeneratorTest(TestCase):
         paths = ["/test", "/test/", "/test.html", "/test.png", "/test.json",
                  "/test/test2/test.123.js", "/test/.test", "/.test", "/", "/.test/123.php", "/TEST/.123.html"]
 
-        patterns = ["/\l", "/\l/", "/\l.html", "/\l.png", "/\l.json", "/test/test2/\l.\d.js", "/test/.\l", "/.\l", "/",
-                    "/.test/\d.php", "/TEST/.\d.html"]
+        patterns = ["/\\l", "/\\l/", "/\\l.html", "/\\l.png", "/\\l.json", "/test/test2/\\l.\\d.js", "/test/.\\l",
+                    "/.\\l", "/", "/.test/\\d.php", "/TEST/.\\d.html"]
         url = "http://www.example.com/"
         for path, pattern in zip(paths, patterns):
             self.assertEqual(self.pg.get_pattern(urljoin(url, path)), pattern)
@@ -298,8 +298,8 @@ class SimilarPathGeneratorTest(TestCase):
     def test_get_pattern_for_filename(self):
         filenames = ["test", "test-123", "123-test", "te12st34", "TEST.html", "test-123.html", "123_test.html",
                      "te12.st34.html", ".Test", ".teSt-123", ".123-test", ".123_test", ".te12st34", "test.php"]
-        patterns = ["\l", "\l-\d", "\d-\l", "\w", "\L.html", "\l-\d.html", "\w.html", "\w.\w.html", ".\i",
-                    ".\i-\d", ".\d-\l", ".\w", ".\w", "\l.php"]
+        patterns = ["\\l", "\\l-\\d", "\\d-\\l", "\\w", "\\L.html", "\\l-\\d.html", "\\w.html", "\\w.\\w.html", ".\\i",
+                    ".\\i-\\d", ".\\d-\\l", ".\\w", ".\\w", "\\l.php"]
         for filename, pattern in zip(filenames, patterns):
             self.assertEqual(self.pg.get_pattern_for_filename(filename), pattern)
 
@@ -309,7 +309,7 @@ class SimilarPathGeneratorTest(TestCase):
 
         directory_patterns = [self.pg.get_pattern_for_directory(dir) for dir in directories]
 
-        expected = ["/\l/", "/\d/", "/\L/", "/\i/", "/\w/", "/.\l/", "/.\d/", "/\d-\l/", "/.\L-\d/", "/"]
+        expected = ["/\\l/", "/\\d/", "/\\L/", "/\\i/", "/\\w/", "/.\\l/", "/.\\d/", "/\\d-\\l/", "/.\\L-\\d/", "/"]
         self.assertEqual(directory_patterns, expected)
 
     def test_get_pattern_for_directory_replace_only_last_subdirectory_of_path_with_its_pattern(self):
@@ -318,8 +318,8 @@ class SimilarPathGeneratorTest(TestCase):
 
         directory_patterns = [self.pg.get_pattern_for_directory(path) for path in paths]
 
-        expected = ["/test/\d/", "/123/\l/", "/test/\L/", "/123/\i/", "/123/.\l/", "/test/.\d/", "/dir/\d-\l/",
-                    "/123/\l-\d/"]
+        expected = ["/test/\\d/", "/123/\\l/", "/test/\\L/", "/123/\\i/", "/123/.\\l/", "/test/.\\d/", "/dir/\\d-\\l/",
+                    "/123/\\l-\\d/"]
         self.assertEqual(directory_patterns, expected)
 
     def test_create_random_url_matching_url_pattern_of_request(self):
@@ -333,9 +333,10 @@ class SimilarPathGeneratorTest(TestCase):
             url = urljoin(base_url, path)
             random_urls.append(self.pg.generate_url(url, self.pg.get_pattern(url)))
 
-        expected = ["/[a-z]+", "/[a-z]+-\d+", "/\d+-[A-Z]+", "/\w+", "/[a-zA-Z]+.html", "/[a-z]+-\d+.html",
-                    "/\w+.html", "/\w+\.\w+.html", "/.[a-z]+", "/.[a-z]+-\d+", "/.\d+-[a-zA⁻Z]+", "/.\w+", "/.\w+",
-                    "/[a-zA-Z]+/", "/[a-zA-Z]+-\d+/", "/\d+-[a-zA-Z]+/", "/[a-z]+/\d+.json", "/\d+/[a-zA-Z]+.json"]
+        expected = ["/[a-z]+", "/[a-z]+-\\d+", "/\\d+-[A-Z]+", "/\\w+", "/[a-zA-Z]+.html", "/[a-z]+-\\d+.html",
+                    "/\\w+.html", "/\\w+\\.\\w+.html", "/.[a-z]+", "/.[a-z]+-\\d+", "/.\\d+-[a-zA-Z]+", "/.\\w+",
+                    "/.\\w+", "/[a-zA-Z]+/", "/[a-zA-Z]+-\\d+/", "/\\d+-[a-zA-Z]+/", "/[a-z]+/\\d+.json",
+                    "/\\d+/[a-zA-Z]+.json"]
         for result, regex in zip(random_urls, expected):
             self.assertTrue(result.startswith(base_url))
             self.assertIsNotNone(re.match(regex, urlparse(result).path))
@@ -344,13 +345,13 @@ class SimilarPathGeneratorTest(TestCase):
         self.assertIsNone(self.pg.get_tail_pattern("http://example.com/login"))
 
     def test_create_tail_pattern_on_directory(self):
-        self.assertEqual("http://example.com/login\l", self.pg.get_tail_pattern("http://example.com/login/"))
+        self.assertEqual("http://example.com/login\\l", self.pg.get_tail_pattern("http://example.com/login/"))
 
     def test_create_tail_pattern_on_file(self):
-        self.assertEqual("http://example.com/login\l", self.pg.get_tail_pattern("http://example.com/login.tar.gz"))
+        self.assertEqual("http://example.com/login\\l", self.pg.get_tail_pattern("http://example.com/login.tar.gz"))
 
     def test_create_tail_pattern_on_file_with_numbers(self):
-        self.assertEqual("http://example.com/login\l", self.pg.get_tail_pattern("http://example.com/login.7z"))
+        self.assertEqual("http://example.com/login\\l", self.pg.get_tail_pattern("http://example.com/login.7z"))
 
 
 class FakeEngine(Engine):
