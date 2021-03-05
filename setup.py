@@ -12,6 +12,7 @@ with open(version_file) as f:
 setup(name='HammerTime-http',
       version=version_data['__version__'],
       description='HammerTime is an HTTP client library aiming to perform a large number of requests on a server as fast as it can take them, but without distrupting operations significantly.',
+      python_requires='>=3.5.0,<3.9.0',
       author='Delve Labs inc.',
       author_email='info@delvelabs.ca',
       url='https://github.com/delvelabs/hammertime',
@@ -20,7 +21,7 @@ setup(name='HammerTime-http',
                 'hammertime.rules',
                 'hammertime.utils'],
       install_requires=[
-          'aiohttp>=3.1.0,<3.6.0',
+          'aiohttp>=3.7.3,<4.0.0',
           'easyinject==0.3',
           'aiodns>=1.1.1,<3.0.0',
           'simhash>=1.8.0,<1.9.0'
