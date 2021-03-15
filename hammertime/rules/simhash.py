@@ -14,8 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-
-
+import logging
 import re
 
 
@@ -43,18 +42,25 @@ try:
             hashes = [unsigned_hash(s.encode("utf-8")) for s in sorted(shingles)]
             return compute(hashes)
 
+        def __eq__(self, other) -> bool:
+            return self.value == other.value
+
 
 except ImportError:
-    from simhash import Simhash as _Simhash
+    try:
+        from simhash import Simhash as _Simhash
 
-    class Simhash(_Simhash):
+        class Simhash(_Simhash):
 
-        def __init__(self, data, filter=DEFAULT_FILTER, token_size=4):
-            self.token_size = token_size
-            super().__init__(data, reg=filter)
+            def __init__(self, data, filter=DEFAULT_FILTER, token_size=4):
+                self.token_size = token_size
+                super().__init__(data, reg=filter)
 
-        def _tokenize(self, content):
-            content = content.lower()
-            content = ''.join(re.findall(self.reg, content))
-            tokens = self._slide(content, self.token_size)
-            return tokens
+            def _tokenize(self, content):
+                content = content.lower()
+                content = ''.join(re.findall(self.reg, content))
+                tokens = self._slide(content, self.token_size)
+                return tokens
+    except ImportError:
+        logging.getLogger(__name__).error("Missing simhash library. Read README.md for installation details.")
+        raise

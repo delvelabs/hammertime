@@ -3,3 +3,4 @@ coverage==4.2
 flake8==3.8.4
 marshmallow_har==1.1.0
 marshmallow_autoschema==0.3.3
+simhash==2.0.0

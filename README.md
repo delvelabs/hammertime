@@ -11,6 +11,16 @@ significantly. The primary focus of the library is to support the development of
 pentest tools. As such, a set of heuristics are provided to rapidly discard some
 requests, filter out invalid responses and generally augment the data available.
 
+## Installation
+HammerTime supports 2 simhash libraries: [simhash](https://pypi.org/project/simhash/) and [simhash-py](https://pypi.org/project/simhash-py/).
+
+`pip install hammertime-http[simhash]`
+
+`pip install hammertime-http[simhash-py]`
+
+`pip install hammertime-http` won't have a simhash library and HammerTime won't work correctly. 
+
+
 ## Contributing
 Most contributions are welcome. Simply submit a pull request on [GitHub](https://github.com/delvelabs/hammertime/).
 

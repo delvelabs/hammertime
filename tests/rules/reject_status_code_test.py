@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch, ANY, Mock
 from urllib.parse import urljoin, urlparse
 import re
 import hashlib
@@ -129,10 +129,14 @@ class TestDetectSoft404(TestCase):
 
         raw = ContentHashSampling()._hash(response)
         self.assertEqual(self.kb.soft_404_responses["http://example.com/"], {
-            "/\\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
-            "/\\d/": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
-            "/.\\l": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)],
-            "/123/\\l.js": [ContentSignature(code=200, content_simhash=ANY, content_hash=raw, content_sample=ANY)]})
+            "/\\l":
+                [ContentSignature(code=200, content_simhash=Mock(value=ANY), content_hash=raw, content_sample=ANY)],
+            "/\\d/":
+                [ContentSignature(code=200, content_simhash=Mock(value=ANY), content_hash=raw, content_sample=ANY)],
+            "/.\\l":
+                [ContentSignature(code=200, content_simhash=Mock(value=ANY), content_hash=raw, content_sample=ANY)],
+            "/123/\\l.js":
+                [ContentSignature(code=200, content_simhash=Mock(value=ANY), content_hash=raw, content_sample=ANY)]})
 
     @async_test()
     async def test_add_None_to_knowledge_base_if_request_failed(self):
