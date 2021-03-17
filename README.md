@@ -18,7 +18,16 @@ HammerTime supports 2 simhash libraries: [simhash](https://pypi.org/project/simh
 
 `pip install hammertime-http[simhash-py]`
 
-`pip install hammertime-http` won't have a simhash library and HammerTime won't work correctly. 
+`pip install hammertime-http` won't have a simhash library and HammerTime won't work correctly.
+
+
+### !!! Note on installing the `simhash-py` version !!!
+The version of simhash-py required isn't released on pypi. It must be installed manually alongside HammerTime, for example by adding it to your `requirements.txt`:
+
+`simhash-py@git+https://github.com/seomoz/simhash-py.git@46de27b310022e3ac7a856c5fc4f4b0df1d76af7`
+ 
+
+This can't be added to `setup.py` as Pypi will refuse to host a release with a non Pypi dependency. 
 
 
 ## Contributing

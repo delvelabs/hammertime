@@ -28,7 +28,10 @@ setup(name='HammerTime-http',
       extras_require={
           'simhash':  ['simhash==2.0.0'],
           'simhash-py': [
-              'simhash-py@git+https://github.com/seomoz/simhash-py.git@46de27b310022e3ac7a856c5fc4f4b0df1d76af7',
+              # 'simhash-py==0.4.2' if released on pypi,
+              #  see https://github.com/seomoz/simhash-py/issues/52#issuecomment-800497785
+              # Can't use this if we want to release on pypi:
+              # 'simhash-py@git+https://github.com/seomoz/simhash-py.git@46de27b310022e3ac7a856c5fc4f4b0df1d76af7',
               'six'
           ]
       },
