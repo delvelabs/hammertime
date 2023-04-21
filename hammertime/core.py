@@ -38,15 +38,14 @@ class HammerTime:
         self.loop = loop
         self.stats = Stats()
 
-        self.request_engine = RetryEngine(request_engine, loop=loop, stats=self.stats, retry_count=retry_count,
+        self.request_engine = RetryEngine(request_engine, stats=self.stats, retry_count=retry_count,
                                           scale_policy=scale_policy)
         if proxy is not None:
             self.request_engine.set_proxy(proxy)
         self.heuristics = Heuristics(kb=kb, request_engine=self.request_engine)
 
         self.tasks = deque()
-        self.closed = asyncio.Future(loop=loop)
-        self.loop.add_signal_handler(signal.SIGINT, self._interrupt)
+        self.closed = asyncio.Future()
         self._success_iterator = None
         self._interrupted = False
         self._request_scheduler = RequestScheduler(loop=loop)
@@ -66,7 +65,7 @@ class HammerTime:
     def request(self, *args, **kwargs):
         if self.is_closed:
             # Return an exception as if it were a task when attempting to request on a closed engine
-            future = asyncio.Future(loop=self.loop)
+            future = asyncio.Future()
             future.set_exception(asyncio.CancelledError())
             return future
 
@@ -144,8 +143,8 @@ class HammerTime:
 
 class QueueIterator:
 
-    def __init__(self, *, loop, has_pending_cb):
-        self.queue = asyncio.Queue(loop=loop)
+    def __init__(self, *, loop=None, has_pending_cb):
+        self.queue = asyncio.Queue()
         self.has_pending = has_pending_cb
 
     def complete(self, entry):

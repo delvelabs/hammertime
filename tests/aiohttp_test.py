@@ -32,7 +32,7 @@ class TestAioHttpEngine(TestCase):
     @async_test()
     async def test_perform_use_proxy_for_request(self, loop):
         asyncio.set_event_loop(loop)
-        engine = AioHttpEngine(loop=loop, proxy="http://some.proxy.com/")
+        engine = AioHttpEngine(proxy="http://some.proxy.com/")
         engine.session.request = make_mocked_coro(return_value=FakeResponse())
         entry = Entry.create("http://www.example.com/1")
 
@@ -43,8 +43,8 @@ class TestAioHttpEngine(TestCase):
                                                        allow_redirects=False, ssl=None)
 
     @async_test()
-    async def test_set_proxy(self, loop):
-        engine = AioHttpEngine(loop=loop)
+    async def test_set_proxy(self):
+        engine = AioHttpEngine()
         proxy_address = "http://some.proxy.com"
 
         engine.set_proxy(proxy_address)
@@ -52,8 +52,8 @@ class TestAioHttpEngine(TestCase):
         self.assertEqual(engine.proxy, proxy_address)
 
     @async_test()
-    async def test_default_ssl_parameters(self, loop):
-        engine = AioHttpEngine(loop=loop)
+    async def test_default_ssl_parameters(self):
+        engine = AioHttpEngine()
         engine.session.request = make_mocked_coro(return_value=FakeResponse())
         entry = Entry.create("http://www.example.com/")
 
@@ -63,10 +63,10 @@ class TestAioHttpEngine(TestCase):
                                                        allow_redirects=False, timeout=0.2, ssl=None)
 
     @async_test()
-    async def test_set_ssl_parameters_set_certification_authority_certificate(self, loop):
+    async def test_set_ssl_parameters_set_certification_authority_certificate(self):
         ssl_context = "ssl_context"
         with patch("ssl.create_default_context", MagicMock(return_value=ssl_context)) as create_default_context:
-            engine = AioHttpEngine(loop=loop)
+            engine = AioHttpEngine()
             engine.session.request = make_mocked_coro(return_value=FakeResponse())
             entry = Entry.create("http://www.example.com/")
 
@@ -78,8 +78,8 @@ class TestAioHttpEngine(TestCase):
             create_default_context.assert_called_once_with(cafile="certificate.cer")
 
     @async_test()
-    async def test_set_ssl_parameters_dont_verify_ssl(self, loop):
-        engine = AioHttpEngine(loop=loop)
+    async def test_set_ssl_parameters_dont_verify_ssl(self):
+        engine = AioHttpEngine()
         engine.session.request = make_mocked_coro(return_value=FakeResponse())
         entry = Entry.create("http://www.example.com/")
 
@@ -92,7 +92,7 @@ class TestAioHttpEngine(TestCase):
     @async_test()
     async def test_perform_use_timeout_of_entry_if_not_none(self, loop):
         asyncio.set_event_loop(loop)
-        engine = AioHttpEngine(loop=loop, proxy="http://some.proxy.com/")
+        engine = AioHttpEngine(proxy="http://some.proxy.com/")
         engine.session.request = make_mocked_coro(return_value=FakeResponse())
         entry = Entry.create("http://www.example.com/1", arguments={"timeout": 10})
 
@@ -105,7 +105,7 @@ class TestAioHttpEngine(TestCase):
     @async_test()
     async def test_specify_header(self, loop):
         asyncio.set_event_loop(loop)
-        engine = AioHttpEngine(loop=loop)
+        engine = AioHttpEngine()
         engine.session.request = make_mocked_coro(return_value=FakeResponse())
         entry = Entry.create("http://www.example.com/1", headers={"User-Agent": "Hammertime 1.2.3"})
 

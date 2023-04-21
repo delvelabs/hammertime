@@ -30,15 +30,15 @@ from ..ruleset import StopRequest, RejectRequest
 
 class AioHttpEngine:
 
-    def __init__(self, *, loop, verify_ssl=True, ca_certificate_file=None, proxy=None, timeout=0.2,
+    def __init__(self, *, loop=None, verify_ssl=True, ca_certificate_file=None, proxy=None, timeout=0.2,
                  disable_cookies=False, client_session=None):
-        self.loop = loop
         self.session = client_session
         if self.session is None:
             if disable_cookies:
-                self.session = ClientSession(loop=loop, cookie_jar=DummyCookieJar(loop=loop))
+                self.session = ClientSession(loop=loop, cookie_jar=DummyCookieJar())
             else:
                 self.session = ClientSession(loop=loop)
+        self.loop = loop
         self.proxy = proxy
         self.timeout = timeout
         self.ssl = None
@@ -78,7 +78,7 @@ class AioHttpEngine:
         req = entry.request
 
         timeout_value = entry.arguments.get("timeout", self.timeout)
-        with timeout(timeout_value + 0.3, loop=self.loop):
+        async with timeout(timeout_value + 0.3):
             extra_args = {}
             if self.proxy:
                 extra_args["proxy"] = self.proxy
@@ -94,7 +94,7 @@ class AioHttpEngine:
 
             await heuristics.after_headers(entry)
 
-            with timeout(2.0):
+            async with timeout(2.0):
                 # read_length is set to -1 if unlimited, which is the same as aiohttp
                 max_length = entry.result.read_length
                 entry.response.set_content(await response.content.read(max_length), response.content.at_eof())

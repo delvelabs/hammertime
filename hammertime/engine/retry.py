@@ -26,14 +26,14 @@ from ..ruleset import StopRequest
 
 class RetryEngine(Engine):
 
-    def __init__(self, engine, *, loop, stats, retry_count=0, retry_delay=1.0,
+    def __init__(self, engine, *, stats, retry_count=0, retry_delay=1.0,
                  scale_policy: Policy = None):
         self.scale_policy = scale_policy or StaticPolicy(30)
         self.request_engine = engine
         self.retry_count = retry_count
         self.stats = stats
         self.general_limiter = self.scale_policy.get_semaphore()
-        self.priority_limiter = asyncio.Semaphore(3, loop=loop)
+        self.priority_limiter = asyncio.Semaphore(3)
         self.default_heuristics = None
         self.retry_delay = retry_delay
 
