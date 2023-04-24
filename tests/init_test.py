@@ -125,7 +125,7 @@ class InitTest(TestCase):
         h.collect_successful_requests()
 
         try:
-            with async_timeout.timeout(0.001):
+            async with async_timeout.timeout(0.001):
                 async for entry in h.successful_requests():
                     entry.request
         except asyncio.TimeoutError:
