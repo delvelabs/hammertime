@@ -6,6 +6,8 @@ __pycache__
 *.swp
 *~
 #PyDev
+.eggs
+HammerTime_http.egg-info
 .project
 .pydevproject
 #output
