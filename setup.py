@@ -12,7 +12,7 @@ with open(version_file) as f:
 setup(name='HammerTime-http',
       version=version_data['__version__'],
       description='HammerTime is an HTTP client library aiming to perform a large number of requests on a server as fast as it can take them, but without distrupting operations significantly.',
-      python_requires='>=3.8.0,<3.12.0',
+      python_requires='>=3.8.0,<4',
       author='Delve Labs inc.',
       author_email='info@delvelabs.ca',
       url='https://github.com/delvelabs/hammertime',
