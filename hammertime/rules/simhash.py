@@ -54,6 +54,10 @@ except ImportError:
 
             def __init__(self, data, filter=DEFAULT_FILTER, token_size=4):
                 self.token_size = token_size
+
+                if len(data) > 4096:
+                    data = data[:4096]
+
                 super().__init__(data, reg=filter)
 
             def _tokenize(self, content):
